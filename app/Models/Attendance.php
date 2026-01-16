@@ -18,7 +18,9 @@ class Attendance extends Model
         'longitude',
         'distance',
         'status',
-        'note'
+        'note',
+        'selfie_photo',
+        'photo_verified'
     ];
 
     protected $casts = [

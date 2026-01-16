@@ -156,45 +156,82 @@ class AdminController extends Controller
 
         $role = $request->query('role', 'murid');
         $date = $request->query('date', Carbon::today()->toDateString());
+        $photoVerified = $request->query('photo_verified');
         
         $attendances = Attendance::with('user')
             ->where('role', $role)
-            ->whereDate('date', $date)
-            ->orderBy('time', 'desc')
-            ->get();
+            ->whereDate('date', $date);
+        
+        if ($photoVerified !== null) {
+            $attendances->where('photo_verified', $photoVerified);
+        }
+        
+        $attendances = $attendances->orderBy('time', 'desc')->get();
 
         return view('admin.attendance', compact('attendances', 'role', 'date'));
     }
 
-   public function updateSchool(Request $request)
-{
-    // Proteksi manual
-    $check = $this->checkAdmin();
-    if ($check) return $check;
+    public function verifyPhoto($id)
+    {
+        // Proteksi manual
+        $check = $this->checkAdmin();
+        if ($check) return $check;
 
-    $request->validate([
-        'latitude' => 'required|numeric',
-        'longitude' => 'required|numeric',
-        'radius' => 'required|integer|min:10'
-    ]);
+        $attendance = Attendance::findOrFail($id);
+        
+        if (!$attendance->selfie_photo) {
+            return back()->with('error', 'Absensi ini tidak memiliki foto selfie.');
+        }
+        
+        $attendance->update([
+            'photo_verified' => true,
+            'note' => ($attendance->note ? $attendance->note . ' | ' : '') . 'Foto sudah diverifikasi oleh admin'
+        ]);
 
-    $school = School::first();
-    
-    if ($school) {
-        $school->update([
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'radius' => $request->radius
-        ]);
-    } else {
-        School::create([
-            'name' => 'Sekolah Anda',
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-            'radius' => $request->radius
-        ]);
+        return back()->with('success', 'Foto selfie berhasil diverifikasi.');
     }
 
-    return back()->with('success', 'Lokasi sekolah berhasil diperbarui.');
-}
+    public function deleteAttendance($id)
+    {
+        // Proteksi manual
+        $check = $this->checkAdmin();
+        if ($check) return $check;
+
+        $attendance = Attendance::findOrFail($id);
+        $attendance->delete();
+
+        return back()->with('success', 'Data absensi berhasil dihapus.');
+    }
+
+    public function updateSchool(Request $request)
+    {
+        // Proteksi manual
+        $check = $this->checkAdmin();
+        if ($check) return $check;
+
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'required|integer|min:10'
+        ]);
+
+        $school = School::first();
+        
+        if ($school) {
+            $school->update([
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                'radius' => $request->radius
+            ]);
+        } else {
+            School::create([
+                'name' => 'Sekolah Anda',
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                'radius' => $request->radius
+            ]);
+        }
+
+        return back()->with('success', 'Lokasi sekolah berhasil diperbarui.');
+    }
 }

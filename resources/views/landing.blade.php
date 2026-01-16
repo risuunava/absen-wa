@@ -10,7 +10,7 @@
             <div class="card-body">
                 <h1 class="card-title display-5 mb-4">Sistem Absensi Sekolah</h1>
                 <p class="card-text lead">
-                    Sistem absensi berbasis lokasi untuk murid dan guru.
+                    Sistem absensi berbasis lokasi dan foto selfie untuk murid dan guru.
                     Pastikan Anda berada dalam radius sekolah untuk melakukan absensi.
                 </p>
                 
@@ -63,15 +63,52 @@
                             <p class="mb-0">Anda dapat melakukan absensi lagi besok.</p>
                         </div>
                     @else
-                        <!-- Attendance Button -->
+                        <!-- Attendance Button with Selfie -->
+                        <div id="selfieSection" style="display: none;">
+                            <h5 class="mb-3"><i class="bi bi-camera"></i> Ambil Foto Selfie</h5>
+                            <div class="row mb-4">
+                                <div class="col-md-6 mx-auto">
+                                    <!-- Video Preview -->
+                                    <video id="video" width="100%" height="auto" autoplay></video>
+                                    <!-- Canvas for Capture -->
+                                    <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
+                                    
+                                    <!-- Captured Image Preview -->
+                                    <div id="capturePreview" class="mt-3" style="display: none;">
+                                        <p class="text-muted">Preview Foto:</p>
+                                        <img id="photoPreview" src="#" alt="Foto Preview" class="img-fluid rounded" style="max-height: 200px;">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-primary" id="captureBtn">
+                                    <i class="bi bi-camera-fill"></i> Ambil Foto
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="retakeBtn" style="display: none;">
+                                    <i class="bi bi-arrow-clockwise"></i> Ambil Ulang
+                                </button>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <small>
+                                    <i class="bi bi-info-circle"></i> 
+                                    Foto selfie akan digunakan untuk validasi kehadiran Anda.
+                                    Pastikan wajah terlihat jelas dan pencahayaan cukup.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- Attendance Form -->
                         <form id="attendanceForm" action="{{ route('hadir') }}" method="POST">
                             @csrf
                             <input type="hidden" name="latitude" id="attendanceLat">
                             <input type="hidden" name="longitude" id="attendanceLng">
                             <input type="hidden" name="distance" id="attendanceDistance">
+                            <input type="hidden" name="selfie_photo" id="selfiePhotoInput">
                             
                             <button type="submit" class="btn btn-success attendance-btn mb-3" id="attendanceBtn" disabled>
-                                <i class="bi bi-check-circle"></i> HADIR
+                                <i class="bi bi-check-circle"></i> HADIR DENGAN FOTO
                             </button>
                             
                             <div id="attendanceMessage" class="text-muted">
@@ -83,7 +120,7 @@
                     @if($userRole === 'guru')
                         <div class="mt-3 text-muted">
                             <i class="bi bi-info-circle"></i> 
-                            Guru wajib melakukan absensi kehadiran seperti murid.
+                            Guru wajib melakukan absensi kehadiran dengan foto selfie seperti murid.
                         </div>
                     @endif
                 @endif
@@ -96,13 +133,13 @@
                 <h5 class="card-title"><i class="bi bi-info-circle"></i> Informasi Sistem</h5>
                 <ul class="list-group list-group-flush">
                     <li class="list-group-item">
-                        <strong>Fitur Utama:</strong> Absensi berbasis lokasi dengan validasi realtime
+                        <strong>Fitur Utama:</strong> Absensi berbasis lokasi dan foto selfie dengan validasi realtime
                     </li>
                     <li class="list-group-item">
-                        <strong>Teknologi:</strong> Geolocation API untuk deteksi posisi
+                        <strong>Teknologi:</strong> Geolocation API dan Webcam untuk deteksi posisi dan foto
                     </li>
                     <li class="list-group-item">
-                        <strong>Validasi:</strong> Absensi hanya valid dalam radius sekolah
+                        <strong>Validasi:</strong> Absensi hanya valid dalam radius sekolah dengan foto selfie
                     </li>
                     <li class="list-group-item">
                         <strong>Role:</strong> Murid, Guru, dan Admin
@@ -118,13 +155,139 @@
     let watchId = null;
     let currentDistance = null;
     let isWithinRadius = false;
+    let videoStream = null;
+    let photoData = null;
+
+    // Camera Functions
+    function startCamera() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: 400,
+                    height: 300,
+                    facingMode: 'user' // Front camera
+                } 
+            })
+            .then(function(stream) {
+                videoStream = stream;
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.play();
+                document.getElementById('selfieSection').style.display = 'block';
+            })
+            .catch(function(err) {
+                console.error("Error accessing camera: ", err);
+                // Fallback to file upload
+                document.getElementById('selfieSection').innerHTML = `
+                    <div class="alert alert-warning">
+                        <p>Kamera tidak dapat diakses. Silakan upload foto:</p>
+                        <input type="file" id="fileInput" accept="image/*" capture="user" class="form-control">
+                    </div>
+                `;
+                document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            });
+        } else {
+            console.error("getUserMedia not supported");
+            document.getElementById('selfieSection').innerHTML = `
+                <div class="alert alert-warning">
+                    <p>Browser tidak mendukung akses kamera. Silakan gunakan browser lain.</p>
+                </div>
+            `;
+        }
+    }
+
+    function capturePhoto() {
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        
+        if (!video || !canvas) {
+            alert('Elemen video atau canvas tidak ditemukan');
+            return;
+        }
+        
+        const context = canvas.getContext('2d');
+        
+        // Set canvas dimensions to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Draw video frame to canvas
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to data URL
+        photoData = canvas.toDataURL('image/jpeg', 0.8); // Quality 80%
+        
+        // Show preview
+        document.getElementById('photoPreview').src = photoData;
+        document.getElementById('capturePreview').style.display = 'block';
+        document.getElementById('captureBtn').style.display = 'none';
+        document.getElementById('retakeBtn').style.display = 'inline-block';
+        
+        // Set photo data to hidden input
+        document.getElementById('selfiePhotoInput').value = photoData;
+        
+        // Update button state
+        updateAttendanceButton();
+    }
+
+    function retakePhoto() {
+        document.getElementById('capturePreview').style.display = 'none';
+        document.getElementById('captureBtn').style.display = 'inline-block';
+        document.getElementById('retakeBtn').style.display = 'none';
+        document.getElementById('selfiePhotoInput').value = '';
+        photoData = null;
+        
+        // Update button state
+        updateAttendanceButton();
+    }
+
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                photoData = e.target.result;
+                document.getElementById('selfiePhotoInput').value = photoData;
+                
+                // Show preview
+                document.getElementById('photoPreview').src = photoData;
+                document.getElementById('capturePreview').style.display = 'block';
+                
+                // Update button state
+                updateAttendanceButton();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function updateAttendanceButton() {
+        const attendanceBtn = document.getElementById('attendanceBtn');
+        const attendanceMessage = document.getElementById('attendanceMessage');
+        
+        if (attendanceBtn) {
+            if (isWithinRadius && photoData) {
+                attendanceBtn.disabled = false;
+                attendanceBtn.classList.remove('btn-secondary');
+                attendanceBtn.classList.add('btn-success');
+                attendanceMessage.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Anda dapat melakukan absensi</span>';
+            } else if (isWithinRadius && !photoData) {
+                attendanceBtn.disabled = true;
+                attendanceBtn.classList.remove('btn-success');
+                attendanceBtn.classList.add('btn-secondary');
+                attendanceMessage.innerHTML = '<span class="text-warning"><i class="bi bi-camera"></i> Ambil foto selfie terlebih dahulu</span>';
+            } else {
+                attendanceBtn.disabled = true;
+                attendanceBtn.classList.remove('btn-success');
+                attendanceBtn.classList.add('btn-secondary');
+                attendanceMessage.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle"></i> Anda harus berada dalam radius sekolah untuk absensi</span>';
+            }
+        }
+    }
 
     function updateDistanceInfo(distance, isWithin) {
         const distanceElement = document.getElementById('distanceValue');
         const statusElement = document.getElementById('attendanceStatus');
         const locationStatus = document.getElementById('locationStatus');
-        const attendanceBtn = document.getElementById('attendanceBtn');
-        const attendanceMessage = document.getElementById('attendanceMessage');
         
         // Format distance
         let displayDistance = 'Error';
@@ -142,24 +305,13 @@
         if (isWithin) {
             statusElement.innerHTML = '<span class="badge bg-success">Dalam Area Sekolah</span>';
             locationStatus.innerHTML = '<i class="bi bi-check-circle"></i> Anda berada dalam radius absensi';
-            
-            if (attendanceBtn) {
-                attendanceBtn.disabled = false;
-                attendanceBtn.classList.remove('btn-secondary');
-                attendanceBtn.classList.add('btn-success');
-                attendanceMessage.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Anda dapat melakukan absensi</span>';
-            }
         } else {
             statusElement.innerHTML = '<span class="badge bg-danger">Di Luar Area Sekolah</span>';
             locationStatus.innerHTML = '<i class="bi bi-exclamation-circle"></i> Anda berada di luar radius absensi';
-            
-            if (attendanceBtn) {
-                attendanceBtn.disabled = true;
-                attendanceBtn.classList.remove('btn-success');
-                attendanceBtn.classList.add('btn-secondary');
-                attendanceMessage.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle"></i> Anda harus berada dalam radius sekolah untuk absensi</span>';
-            }
         }
+        
+        // Update button state
+        updateAttendanceButton();
     }
 
     function showError(message) {
@@ -236,9 +388,9 @@
                         console.error('AJAX error:', error);
                         showError('Gagal menghitung jarak ke server');
                         
-// Fallback: calculate distance manually
-const schoolLat = {{ $school->latitude ?? -6.8632300 }};
-const schoolLng = {{ $school->longitude ?? 108.0491849 }};
+                        // Fallback: calculate distance manually
+                        const schoolLat = {{ $school->latitude ?? -6.8632300 }};
+                        const schoolLng = {{ $school->longitude ?? 108.0491849 }};
                         const distance = calculateDistance(lat, lng, schoolLat, schoolLng);
                         const radius = {{ $school->radius ?? 100 }};
                         updateDistanceInfo(distance, distance <= radius);
@@ -264,10 +416,10 @@ const schoolLng = {{ $school->longitude ?? 108.0491849 }};
                 }
                 showError(message);
                 
-// Fallback untuk testing: gunakan lokasi sekolah
-console.log('Using fallback location for testing');
-const schoolLat = {{ $school->latitude ?? -6.8632300 }};
-const schoolLng = {{ $school->longitude ?? 108.0491849 }};
+                // Fallback untuk testing: gunakan lokasi sekolah
+                console.log('Using fallback location for testing');
+                const schoolLat = {{ $school->latitude ?? -6.8632300 }};
+                const schoolLng = {{ $school->longitude ?? 108.0491849 }};
                 const distance = 50; // Simulasi 50 meter
                 const radius = {{ $school->radius ?? 100 }};
                 
@@ -331,22 +483,43 @@ const schoolLng = {{ $school->longitude ?? 108.0491849 }};
 
     // Handle form submission
     document.getElementById('attendanceForm')?.addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevent default untuk debugging
+        
+        console.log('Form submission started');
+        console.log('Is within radius:', isWithinRadius);
+        console.log('Current distance:', currentDistance);
+        console.log('Photo data:', photoData ? 'Yes' : 'No');
+        
         if (!isWithinRadius) {
-            e.preventDefault();
             alert('Anda harus berada dalam radius sekolah untuk melakukan absensi.');
-            return;
+            return false;
         }
         
         if (!currentDistance) {
-            e.preventDefault();
             alert('Sedang mengambil lokasi. Silakan tunggu sebentar.');
-            return;
+            return false;
+        }
+        
+        if (!photoData) {
+            alert('Silakan ambil foto selfie terlebih dahulu.');
+            return false;
         }
         
         // Show confirmation
-        if (!confirm(`Anda berada ${Math.round(currentDistance)} meter dari sekolah. Apakah Anda yakin ingin melakukan absensi?`)) {
-            e.preventDefault();
+        if (confirm(`Anda berada ${Math.round(currentDistance)} meter dari sekolah. Foto selfie akan digunakan untuk validasi. Lanjutkan absensi?`)) {
+            console.log('Submitting form...');
+            
+            // Show loading state
+            const submitBtn = document.getElementById('attendanceBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyimpan...';
+            submitBtn.disabled = true;
+            
+            // Submit form
+            this.submit();
         }
+        
+        return false;
     });
 
     // Button untuk manual retry
@@ -358,6 +531,15 @@ const schoolLng = {{ $school->longitude ?? 108.0491849 }};
     // Initialize on page load
     $(document).ready(function() {
         console.log('Document ready, initializing geolocation...');
+        
+        // Start camera if user is logged in and can attend
+        @if(session()->has('user_id') && !$hasAttendedToday)
+            startCamera();
+        @endif
+        
+        // Event listeners for camera buttons
+        document.getElementById('captureBtn')?.addEventListener('click', capturePhoto);
+        document.getElementById('retakeBtn')?.addEventListener('click', retakePhoto);
         
         // Tunggu sedikit sebelum request lokasi
         setTimeout(function() {
@@ -383,8 +565,8 @@ const schoolLng = {{ $school->longitude ?? 108.0491849 }};
         console.log('navigator.geolocation:', navigator.geolocation);
         
         // Test dengan lokasi dummy
-const dummyLat = -6.8632300;
-const dummyLng = 108.0491849;
+        const dummyLat = -6.8632300;
+        const dummyLng = 108.0491849;
         const distance = Math.random() * 200; // Random distance 0-200m
         
         document.getElementById('attendanceLat').value = dummyLat;

@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\School;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class AttendanceController extends Controller
 {
@@ -43,7 +44,8 @@ class AttendanceController extends Controller
         $request->validate([
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
-            'distance' => 'required|numeric'
+            'distance' => 'required|numeric',
+            'selfie_photo' => 'required' // Hanya validasi required, tidak pakai image validation dulu
         ]);
 
         $school = School::first();
@@ -64,7 +66,34 @@ class AttendanceController extends Controller
             return back()->with('error', 'Anda sudah melakukan absensi hari ini.');
         }
 
-        Attendance::create([
+        // Upload foto selfie dari base64
+        $selfiePath = null;
+        $photoData = $request->input('selfie_photo');
+        
+        if ($photoData && strpos($photoData, 'data:image') === 0) {
+            // Data adalah base64
+            try {
+                // Decode base64 image
+                list($type, $photoData) = explode(';', $photoData);
+                list(, $photoData) = explode(',', $photoData);
+                $photoData = base64_decode($photoData);
+                
+                // Generate filename
+                $fileName = 'selfie_' . $userId . '_' . time() . '.jpg';
+                $storagePath = 'selfies/' . $fileName;
+                
+                // Simpan ke storage
+                Storage::disk('public')->put($storagePath, $photoData);
+                
+                $selfiePath = $storagePath;
+            } catch (\Exception $e) {
+                // Jika error saat upload foto, tetap lanjutkan absensi tanpa foto
+                $selfiePath = null;
+            }
+        }
+
+        // Simpan data absensi
+        $attendance = Attendance::create([
             'user_id' => $userId,
             'role' => $userRole,
             'date' => $today,
@@ -73,10 +102,16 @@ class AttendanceController extends Controller
             'longitude' => $request->longitude,
             'distance' => $distance,
             'status' => $status,
-            'note' => $status === 'VALID' ? 'Absensi valid' : 'Di luar radius sekolah'
+            'note' => $status === 'VALID' ? 'Absensi valid' : 'Di luar radius sekolah',
+            'selfie_photo' => $selfiePath,
+            'photo_verified' => false
         ]);
 
-        return back()->with('success', 'Absensi berhasil disimpan. Status: ' . $status);
+        if ($attendance) {
+            return back()->with('success', 'Absensi berhasil disimpan dengan foto selfie. Status: ' . $status);
+        } else {
+            return back()->with('error', 'Gagal menyimpan absensi. Silakan coba lagi.');
+        }
     }
 
     public function getDistance(Request $request)

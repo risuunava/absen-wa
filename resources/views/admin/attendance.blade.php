@@ -40,12 +40,12 @@
                     </div>
                     
                     <div class="col-md-4">
-                        <label class="form-label">&nbsp;</label>
-                        <div>
-                            <a href="{{ route('admin.attendance') }}" class="btn btn-secondary">
-                                <i class="bi bi-arrow-clockwise"></i> Reset
-                            </a>
-                        </div>
+                        <label for="photo_verified" class="form-label">Status Foto</label>
+                        <select class="form-select" id="photo_verified" name="photo_verified" onchange="this.form.submit()">
+                            <option value="">Semua</option>
+                            <option value="1" {{ request('photo_verified') == '1' ? 'selected' : '' }}>Sudah Diverifikasi</option>
+                            <option value="0" {{ request('photo_verified') == '0' ? 'selected' : '' }}>Belum Diverifikasi</option>
+                        </select>
                     </div>
                 </form>
             </div>
@@ -78,10 +78,13 @@
                                     @endif
                                     <th>Tanggal</th>
                                     <th>Waktu</th>
+                                    <th>Foto Selfie</th>
+                                    <th>Validasi Foto</th>
                                     <th>Lokasi</th>
                                     <th>Jarak</th>
                                     <th>Status</th>
                                     <th>Keterangan</th>
+                                    <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -94,6 +97,64 @@
                                         </td>
                                         <td>{{ $attendance->date->format('d/m/Y') }}</td>
                                         <td>{{ $attendance->time }}</td>
+                                        <td>
+                                            @if($attendance->selfie_photo)
+                                                <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#photoModal{{ $attendance->id }}">
+                                                    <i class="bi bi-eye"></i> Lihat Foto
+                                                </button>
+                                                
+                                                <!-- Modal for Photo -->
+                                                <div class="modal fade" id="photoModal{{ $attendance->id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-lg">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Foto Selfie - {{ $attendance->user->full_name ?? $attendance->user->username }}</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <div class="modal-body text-center">
+                                                                <img src="{{ asset('storage/' . $attendance->selfie_photo) }}" 
+                                                                     alt="Foto Selfie" class="img-fluid rounded" style="max-height: 500px;">
+                                                                <div class="mt-3">
+                                                                    <p class="text-muted">
+                                                                        <small>
+                                                                            Diambil pada: {{ $attendance->date->format('d/m/Y') }} {{ $attendance->time }}
+                                                                        </small>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                                                                @if(!$attendance->photo_verified)
+                                                                    <form action="{{ route('admin.verify.photo', $attendance->id) }}" method="POST" style="display: inline;">
+                                                                        @csrf
+                                                                        <button type="submit" class="btn btn-success">
+                                                                            <i class="bi bi-check-circle"></i> Verifikasi Foto
+                                                                        </button>
+                                                                    </form>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <span class="badge bg-warning">Tidak ada foto</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($attendance->selfie_photo)
+                                                @if($attendance->photo_verified)
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle"></i> Sudah diverifikasi
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-warning">
+                                                        <i class="bi bi-clock-history"></i> Belum diverifikasi
+                                                    </span>
+                                                @endif
+                                            @else
+                                                <span class="badge bg-secondary">-</span>
+                                            @endif
+                                        </td>
                                         <td>
                                             @if($attendance->latitude && $attendance->longitude)
                                                 <small>
@@ -111,10 +172,82 @@
                                             </span>
                                         </td>
                                         <td>{{ $attendance->note ?? '-' }}</td>
+                                        <td>
+                                            @if($attendance->selfie_photo && !$attendance->photo_verified)
+                                                <form action="{{ route('admin.verify.photo', $attendance->id) }}" method="POST" style="display: inline;">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-success" title="Verifikasi Foto">
+                                                        <i class="bi bi-check-circle"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $attendance->id }}" title="Hapus">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            
+                                            <!-- Delete Modal -->
+                                            <div class="modal fade" id="deleteModal{{ $attendance->id }}" tabindex="-1">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Konfirmasi Hapus</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            Apakah Anda yakin ingin menghapus absensi ini?
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                                            <form action="{{ route('admin.attendance.delete', $attendance->id) }}" method="POST">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="btn btn-danger">Hapus</button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Summary Statistics -->
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h6>Total Absensi</h6>
+                                    <h3>{{ count($attendances) }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h6>Foto Terverifikasi</h6>
+                                    <h3>{{ $attendances->where('photo_verified', true)->count() }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h6>Foto Belum Diverifikasi</h6>
+                                    <h3>{{ $attendances->where('selfie_photo', '!=', null)->where('photo_verified', false)->count() }}</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h6>Tanpa Foto</h6>
+                                    <h3>{{ $attendances->where('selfie_photo', null)->count() }}</h3>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="mt-3">
@@ -122,6 +255,8 @@
                             <i class="bi bi-info-circle"></i>
                             Total absensi {{ $role }} pada {{ date('d/m/Y', strtotime($date)) }}: 
                             <strong>{{ count($attendances) }}</strong> data
+                            | Foto terverifikasi: <strong>{{ $attendances->where('photo_verified', true)->count() }}</strong>
+                            | Foto belum diverifikasi: <strong>{{ $attendances->where('selfie_photo', '!=', null)->where('photo_verified', false)->count() }}</strong>
                         </div>
                     </div>
                 @else
@@ -138,3 +273,22 @@
     </div>
 </div>
 @endsection
+
+@push('styles')
+<style>
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.85em;
+}
+.status-valid {
+    background-color: #d4edda;
+    color: #155724;
+}
+.status-invalid {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+</style>
+@endpush
