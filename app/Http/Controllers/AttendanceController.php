@@ -2,81 +2,107 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Student;
 use App\Models\Attendance;
 use App\Models\School;
+use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class AttendanceController extends Controller
 {
-    /**
-     * Form absensi berdasarkan nomor HP
-     */
-    public function form($phone)
+    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
-        $student = Student::where('phone', $phone)->firstOrFail();
-        return view('hadir', compact('student'));
+        $earthRadius = 6371000; // Radius bumi dalam meter
+        
+        $lat1 = deg2rad($lat1);
+        $lon1 = deg2rad($lon1);
+        $lat2 = deg2rad($lat2);
+        $lon2 = deg2rad($lon2);
+        
+        $latDelta = $lat2 - $lat1;
+        $lonDelta = $lon2 - $lon1;
+        
+        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+            cos($lat1) * cos($lat2) * pow(sin($lonDelta / 2), 2)));
+        
+        return $angle * $earthRadius;
     }
 
-    /**
-     * Simpan absensi
-     */
-    public function store(Request $request)
+    public function hadir(Request $request)
     {
-        // VALIDASI WAJIB
-        if (!$request->latitude || !$request->longitude) {
-            return response('Lokasi tidak terdeteksi. Aktifkan GPS.', 400);
+        if (!session()->has('user_id')) {
+            return redirect('/login')->with('error', 'Silakan login terlebih dahulu.');
         }
+
+        $userId = session('user_id');
+        $userRole = session('user_role');
+        
+        if ($userRole === 'admin') {
+            return redirect('/admin')->with('error', 'Admin tidak dapat melakukan absensi.');
+        }
+
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'distance' => 'required|numeric'
+        ]);
 
         $school = School::first();
         if (!$school) {
-            return response('Data sekolah belum diatur.', 500);
+            return back()->with('error', 'Konfigurasi sekolah belum ditentukan.');
         }
 
-        // Hitung jarak dari sekolah (meter)
-        $distance = $this->calculateDistance(
-            $school->latitude,
-            $school->longitude,
-            $request->latitude,
-            $request->longitude
-        );
-
-        // Status absensi
+        $distance = $request->distance;
         $status = $distance <= $school->radius ? 'VALID' : 'INVALID';
 
-        // Simpan ke database
+        $today = Carbon::today()->toDateString();
+        
+        $existingAttendance = Attendance::where('user_id', $userId)
+            ->whereDate('date', $today)
+            ->first();
+
+        if ($existingAttendance) {
+            return back()->with('error', 'Anda sudah melakukan absensi hari ini.');
+        }
+
         Attendance::create([
-            'student_id' => $request->student_id,
-            'date'       => now()->toDateString(),
-            'time'       => now()->toTimeString(),
-            'latitude'   => $request->latitude,
-            'longitude'  => $request->longitude,
-            'distance'   => round($distance, 2),
-            'status'     => $status,
-            'note'       => $status === 'VALID'
-                ? 'Hadir'
-                : 'Di luar area sekolah'
+            'user_id' => $userId,
+            'role' => $userRole,
+            'date' => $today,
+            'time' => Carbon::now()->toTimeString(),
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
+            'distance' => $distance,
+            'status' => $status,
+            'note' => $status === 'VALID' ? 'Absensi valid' : 'Di luar radius sekolah'
         ]);
 
-        return response("Absensi $status", 200);
+        return back()->with('success', 'Absensi berhasil disimpan. Status: ' . $status);
     }
 
-    /**
-     * Hitung jarak dua koordinat (meter)
-     */
-    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    public function getDistance(Request $request)
     {
-        $earthRadius = 6371000; // meter
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric'
+        ]);
 
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
+        $school = School::first();
+        if (!$school) {
+            return response()->json(['error' => 'Sekolah tidak ditemukan'], 404);
+        }
 
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-            sin($dLon / 2) * sin($dLon / 2);
+        $distance = $this->calculateDistance(
+            $request->latitude,
+            $request->longitude,
+            $school->latitude,
+            $school->longitude
+        );
 
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
-        return $earthRadius * $c;
+        return response()->json([
+            'distance' => round($distance, 2),
+            'radius' => $school->radius,
+            'school_name' => $school->name,
+            'is_within_radius' => $distance <= $school->radius
+        ]);
     }
 }
