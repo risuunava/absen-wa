@@ -10,8 +10,8 @@
             <div class="card-body">
                 <h1 class="card-title display-5 mb-4">Sistem Absensi Sekolah</h1>
                 <p class="card-text lead">
-                    Sistem absensi berbasis lokasi dan foto selfie untuk murid dan guru.
-                    Pastikan Anda berada dalam radius sekolah untuk melakukan absensi.
+                    Sistem absensi berbasis lokasi, foto selfie, dan waktu untuk murid dan guru.
+                    Pastikan Anda berada dalam radius sekolah dan pada waktu yang ditentukan untuk melakukan absensi.
                 </p>
                 
                 @if($school)
@@ -21,6 +21,32 @@
                         Radius Absensi: {{ $school->radius }} meter
                     </div>
                 @endif
+
+                <!-- TIMEZONE INFO (Hanya tampil di development) -->
+                @if(env('APP_DEBUG', false))
+                <div class="alert alert-dark">
+                    <small>
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Timezone Info:</strong> 
+                        <span id="timezoneInfo">Loading...</span>
+                    </small>
+                </div>
+                @endif
+
+                <!-- Attendance Time Information -->
+                <div class="alert" id="timeInfoAlert">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-clock me-2 fs-4"></i>
+                        <div>
+                            <strong id="timeInfoTitle">Memuat informasi waktu absen...</strong>
+                            <div id="timeInfoContent">
+                                <div class="spinner-border spinner-border-sm text-dark" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -54,6 +80,7 @@
                     <div class="alert alert-success mb-4">
                         <h5><i class="bi bi-person-check"></i> Halo, {{ $fullName ?? $userName }}!</h5>
                         <p class="mb-0">Anda login sebagai <strong>{{ ucfirst($userRole) }}</strong></p>
+                        <small>User ID: {{ session('user_id') }}</small>
                     </div>
 
                     @if($hasAttendedToday)
@@ -112,9 +139,26 @@
                             </button>
                             
                             <div id="attendanceMessage" class="text-muted">
-                                Tombol akan aktif ketika Anda berada dalam radius sekolah
+                                <div class="spinner-border spinner-border-sm me-2" role="status" id="timeCheckSpinner">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span id="attendanceMessageText">
+                                    Memeriksa kondisi absensi...
+                                </span>
                             </div>
                         </form>
+                        
+                        <!-- Debug Buttons (Only in debug mode) -->
+                        @if(env('APP_DEBUG', false))
+                        <div class="mt-3">
+                            <button onclick="testTimeCheck()" class="btn btn-sm btn-outline-info">
+                                <i class="bi bi-clock"></i> Test Waktu
+                            </button>
+                            <button onclick="forceEnableAttendance()" class="btn btn-sm btn-outline-warning ms-2">
+                                <i class="bi bi-unlock"></i> Force Enable
+                            </button>
+                        </div>
+                        @endif
                     @endif
                     
                     @if($userRole === 'guru')
@@ -133,13 +177,16 @@
                 <h5 class="card-title"><i class="bi bi-info-circle"></i> Informasi Sistem</h5>
                 <ul class="list-group list-group-flush">
                     <li class="list-group-item">
-                        <strong>Fitur Utama:</strong> Absensi berbasis lokasi dan foto selfie dengan validasi realtime
+                        <strong>Fitur Utama:</strong> Absensi berbasis lokasi, waktu, dan foto selfie dengan validasi realtime
                     </li>
                     <li class="list-group-item">
-                        <strong>Teknologi:</strong> Geolocation API dan Webcam untuk deteksi posisi dan foto
+                        <strong>Validasi Waktu:</strong> Absensi hanya dapat dilakukan pada jam yang telah ditentukan admin
                     </li>
                     <li class="list-group-item">
-                        <strong>Validasi:</strong> Absensi hanya valid dalam radius sekolah dengan foto selfie
+                        <strong>Validasi Lokasi:</strong> Absensi hanya valid dalam radius sekolah
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Validasi Foto:</strong> Wajib mengambil foto selfie untuk setiap absensi
                     </li>
                     <li class="list-group-item">
                         <strong>Role:</strong> Murid, Guru, dan Admin
@@ -157,15 +204,39 @@
     let isWithinRadius = false;
     let videoStream = null;
     let photoData = null;
+    let isAllowedTime = false;
+    let timeMessage = 'Memeriksa waktu...';
+    let activeTimeSettings = [];
+    let serverTimezone = 'Loading...';
 
-    // Camera Functions
+    // ============================================
+    // TIMEZONE FUNCTIONS
+    // ============================================
+
+    // Fungsi untuk menampilkan info timezone
+    function updateTimezoneInfo() {
+        const now = new Date();
+        const clientTime = now.toLocaleTimeString('id-ID');
+        const clientDate = now.toLocaleDateString('id-ID');
+        const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        
+        document.getElementById('timezoneInfo').innerHTML = `
+            Client: ${clientDate} ${clientTime} (${clientTimezone}) |
+            Server: <span id="serverTime">${serverTimezone}</span>
+        `;
+    }
+
+    // ============================================
+    // CAMERA FUNCTIONS
+    // ============================================
+
     function startCamera() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     width: 400,
                     height: 300,
-                    facingMode: 'user' // Front camera
+                    facingMode: 'user'
                 } 
             })
             .then(function(stream) {
@@ -177,7 +248,6 @@
             })
             .catch(function(err) {
                 console.error("Error accessing camera: ", err);
-                // Fallback to file upload
                 document.getElementById('selfieSection').innerHTML = `
                     <div class="alert alert-warning">
                         <p>Kamera tidak dapat diakses. Silakan upload foto:</p>
@@ -206,27 +276,19 @@
         }
         
         const context = canvas.getContext('2d');
-        
-        // Set canvas dimensions to match video
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        
-        // Draw video frame to canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // Convert canvas to data URL
-        photoData = canvas.toDataURL('image/jpeg', 0.8); // Quality 80%
+        photoData = canvas.toDataURL('image/jpeg', 0.8);
         
-        // Show preview
         document.getElementById('photoPreview').src = photoData;
         document.getElementById('capturePreview').style.display = 'block';
         document.getElementById('captureBtn').style.display = 'none';
         document.getElementById('retakeBtn').style.display = 'inline-block';
         
-        // Set photo data to hidden input
         document.getElementById('selfiePhotoInput').value = photoData;
         
-        // Update button state
         updateAttendanceButton();
     }
 
@@ -237,7 +299,6 @@
         document.getElementById('selfiePhotoInput').value = '';
         photoData = null;
         
-        // Update button state
         updateAttendanceButton();
     }
 
@@ -249,47 +310,222 @@
                 photoData = e.target.result;
                 document.getElementById('selfiePhotoInput').value = photoData;
                 
-                // Show preview
                 document.getElementById('photoPreview').src = photoData;
                 document.getElementById('capturePreview').style.display = 'block';
                 
-                // Update button state
                 updateAttendanceButton();
             };
             reader.readAsDataURL(file);
         }
     }
 
+    // ============================================
+    // TIME CHECK FUNCTIONS
+    // ============================================
+
+    // Load time settings - FUNCTION UTAMA UNTUK CHECK WAKTU
+    function loadTimeSettings() {
+        console.log('Memuat pengaturan waktu dari server...');
+        
+        $.ajax({
+            url: '{{ route("check.attendance.time") }}',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                console.log('✅ Response waktu dari server:', response);
+                
+                isAllowedTime = response.allowed;
+                timeMessage = response.message;
+                activeTimeSettings = response.settings || [];
+                
+                // Update server timezone info
+                if (response.timezone) {
+                    serverTimezone = response.timezone;
+                }
+                if (response.server_time) {
+                    serverTimezone = response.server_time + ' (' + (response.timezone || 'Asia/Jakarta') + ')';
+                }
+                
+                updateTimeInfoDisplay(response);
+                updateAttendanceButton();
+                
+                // Hide spinner setelah data diterima
+                document.getElementById('timeCheckSpinner').style.display = 'none';
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Gagal memuat pengaturan waktu:', error);
+                console.error('Response:', xhr.responseText);
+                
+                // Fallback untuk testing
+                const now = new Date();
+                const clientTime = now.toLocaleTimeString('id-ID', {hour12: false});
+                const clientDay = now.toLocaleDateString('id-ID', {weekday: 'long'});
+                const hour = now.getHours().toString().padStart(2, '0');
+                const minute = now.getMinutes().toString().padStart(2, '0');
+                
+                // Untuk testing, anggap waktu diizinkan jika antara 07:00 - 16:00
+                const isTestingAllowed = (hour >= 7 && hour < 16);
+                
+                isAllowedTime = isTestingAllowed;
+                timeMessage = isTestingAllowed ? 
+                    'Mode testing - waktu diizinkan (07:00-16:00)' : 
+                    'Mode testing - waktu tidak diizinkan (07:00-16:00)';
+                activeTimeSettings = [];
+                
+                updateTimeInfoDisplay({
+                    allowed: isTestingAllowed,
+                    message: timeMessage,
+                    current_time: clientTime,
+                    current_hour_minute: hour + ':' + minute,
+                    current_day_name: clientDay
+                });
+                updateAttendanceButton();
+                
+                // Hide spinner
+                document.getElementById('timeCheckSpinner').style.display = 'none';
+            }
+        });
+    }
+
+    function updateTimeInfoDisplay(response) {
+        const timeAlert = document.getElementById('timeInfoAlert');
+        const timeTitle = document.getElementById('timeInfoTitle');
+        const timeContent = document.getElementById('timeInfoContent');
+        
+        if (isAllowedTime) {
+            timeAlert.className = 'alert alert-success';
+            timeTitle.innerHTML = '<i class="bi bi-check-circle"></i> Waktu Absen DIJINKAN';
+            
+            let settingsHtml = '';
+            if (activeTimeSettings && activeTimeSettings.length > 0) {
+                settingsHtml = '<div class="mt-2"><small>Waktu yang diizinkan:</small><div>';
+                activeTimeSettings.forEach(setting => {
+                    settingsHtml += `<span class="badge bg-light text-dark me-1 mb-1">
+                        ${setting.name}: ${setting.time_range} (${setting.type})
+                    </span>`;
+                });
+                settingsHtml += '</div></div>';
+            }
+            
+            timeContent.innerHTML = `
+                <div><strong>${timeMessage}</strong></div>
+                <small>Waktu server: ${response.current_hour_minute || response.current_time || ''}</small>
+                <br>
+                <small>Hari: ${response.current_day_name || ''}</small>
+                ${settingsHtml}
+            `;
+        } else {
+            timeAlert.className = 'alert alert-danger';
+            timeTitle.innerHTML = '<i class="bi bi-x-circle"></i> Waktu Absen TIDAK DIJINKAN';
+            
+            let settingsHtml = '';
+            if (activeTimeSettings && activeTimeSettings.length > 0) {
+                settingsHtml = '<div class="mt-2"><small><strong>Waktu absen yang diizinkan:</strong></small><ul class="mb-0">';
+                activeTimeSettings.forEach(setting => {
+                    settingsHtml += `<li><strong>${setting.name}</strong>: ${setting.time_range} (${setting.type})</li>`;
+                });
+                settingsHtml += '</ul></div>';
+            }
+            
+            timeContent.innerHTML = `
+                <div><strong>${timeMessage}</strong></div>
+                <small>Waktu server: ${response.current_hour_minute || response.current_time || ''}</small>
+                <br>
+                <small>Hari: ${response.current_day_name || ''}</small>
+                ${settingsHtml}
+            `;
+        }
+    }
+
+    function testTimeCheck() {
+        console.log('Manual time check triggered...');
+        document.getElementById('timeCheckSpinner').style.display = 'inline-block';
+        loadTimeSettings();
+    }
+
+    // ============================================
+    // ATTENDANCE BUTTON FUNCTIONS
+    // ============================================
+
     function updateAttendanceButton() {
         const attendanceBtn = document.getElementById('attendanceBtn');
-        const attendanceMessage = document.getElementById('attendanceMessage');
+        const attendanceMessage = document.getElementById('attendanceMessageText');
+        const timeSpinner = document.getElementById('timeCheckSpinner');
         
         if (attendanceBtn) {
-            if (isWithinRadius && photoData) {
+            if (isWithinRadius && photoData && isAllowedTime) {
                 attendanceBtn.disabled = false;
-                attendanceBtn.classList.remove('btn-secondary');
-                attendanceBtn.classList.add('btn-success');
-                attendanceMessage.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> Anda dapat melakukan absensi</span>';
+                attendanceBtn.className = 'btn btn-success attendance-btn mb-3';
+                attendanceMessage.innerHTML = `
+                    <i class="bi bi-check-circle"></i> 
+                    Anda dapat melakukan absensi
+                    <br>
+                    <small>${timeMessage}</small>`;
+                timeSpinner.style.display = 'none';
+            } else if (!isAllowedTime) {
+                attendanceBtn.disabled = true;
+                attendanceBtn.className = 'btn btn-secondary attendance-btn mb-3';
+                attendanceMessage.innerHTML = `
+                    <i class="bi bi-clock"></i> 
+                    ${timeMessage}
+                    <br>
+                    <small>Absensi hanya dapat dilakukan pada jam yang ditentukan</small>`;
+                timeSpinner.style.display = 'none';
             } else if (isWithinRadius && !photoData) {
                 attendanceBtn.disabled = true;
-                attendanceBtn.classList.remove('btn-success');
-                attendanceBtn.classList.add('btn-secondary');
-                attendanceMessage.innerHTML = '<span class="text-warning"><i class="bi bi-camera"></i> Ambil foto selfie terlebih dahulu</span>';
+                attendanceBtn.className = 'btn btn-warning attendance-btn mb-3';
+                attendanceMessage.innerHTML = `
+                    <i class="bi bi-camera"></i> 
+                    Ambil foto selfie terlebih dahulu
+                    <br>
+                    <small>${timeMessage}</small>`;
+                timeSpinner.style.display = 'none';
+            } else if (!isWithinRadius) {
+                attendanceBtn.disabled = true;
+                attendanceBtn.className = 'btn btn-secondary attendance-btn mb-3';
+                attendanceMessage.innerHTML = `
+                    <i class="bi bi-geo-alt"></i> 
+                    Anda harus berada dalam radius sekolah untuk absensi
+                    <br>
+                    <small>${timeMessage}</small>`;
+                timeSpinner.style.display = 'none';
             } else {
                 attendanceBtn.disabled = true;
-                attendanceBtn.classList.remove('btn-success');
-                attendanceBtn.classList.add('btn-secondary');
-                attendanceMessage.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle"></i> Anda harus berada dalam radius sekolah untuk absensi</span>';
+                attendanceBtn.className = 'btn btn-secondary attendance-btn mb-3';
+                attendanceMessage.innerHTML = `
+                    <i class="bi bi-hourglass"></i> 
+                    Memeriksa kondisi absensi...
+                    <br>
+                    <small>${timeMessage}</small>`;
             }
         }
     }
+
+    // Force enable untuk testing (debug mode)
+    function forceEnableAttendance() {
+        if (!confirm('Force enable tombol absensi? Hanya untuk testing!')) return;
+        
+        isAllowedTime = true;
+        isWithinRadius = true;
+        photoData = 'data:image/jpeg;base64,test';
+        document.getElementById('selfiePhotoInput').value = photoData;
+        
+        updateAttendanceButton();
+        
+        alert('Tombol absensi di-force enable untuk testing!');
+    }
+
+    // ============================================
+    // LOCATION FUNCTIONS
+    // ============================================
 
     function updateDistanceInfo(distance, isWithin) {
         const distanceElement = document.getElementById('distanceValue');
         const statusElement = document.getElementById('attendanceStatus');
         const locationStatus = document.getElementById('locationStatus');
         
-        // Format distance
         let displayDistance = 'Error';
         if (distance !== null && !isNaN(distance)) {
             displayDistance = Math.round(distance) + ' meter';
@@ -299,7 +535,6 @@
         currentDistance = distance;
         isWithinRadius = isWithin;
         
-        // Update hidden inputs
         document.getElementById('attendanceDistance').value = distance || 0;
         
         if (isWithin) {
@@ -310,7 +545,6 @@
             locationStatus.innerHTML = '<i class="bi bi-exclamation-circle"></i> Anda berada di luar radius absensi';
         }
         
-        // Update button state
         updateAttendanceButton();
     }
 
@@ -324,8 +558,7 @@
         const attendanceBtn = document.getElementById('attendanceBtn');
         if (attendanceBtn) {
             attendanceBtn.disabled = true;
-            attendanceBtn.classList.remove('btn-success');
-            attendanceBtn.classList.add('btn-secondary');
+            attendanceBtn.className = 'btn btn-secondary attendance-btn mb-3';
         }
     }
 
@@ -335,42 +568,29 @@
     }
 
     function getLocation() {
-        console.log('getLocation() called');
-        
         if (!navigator.geolocation) {
             showError('Browser tidak mendukung Geolocation API');
             return;
         }
 
-        // Show loading state
         document.getElementById('distanceValue').textContent = 'Mengambil lokasi...';
         document.getElementById('attendanceStatus').innerHTML = 
             '<span class="badge bg-info">Meminta izin lokasi...</span>';
         
-        console.log('Requesting location permission...');
-
-        // Options for geolocation
         const options = {
             enableHighAccuracy: true,
-            timeout: 15000, // 15 detik timeout
+            timeout: 15000,
             maximumAge: 0
         };
 
-        // Get current position
         navigator.geolocation.getCurrentPosition(
-            // Success callback
             (position) => {
-                console.log('Geolocation success! Position:', position.coords);
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 
-                console.log('Latitude:', lat, 'Longitude:', lng);
-                
-                // Update hidden inputs
                 document.getElementById('attendanceLat').value = lat;
                 document.getElementById('attendanceLng').value = lng;
                 
-                // Send to server to calculate distance
                 $.ajax({
                     url: '{{ route("get.distance") }}',
                     method: 'POST',
@@ -380,15 +600,10 @@
                         longitude: lng
                     },
                     success: function(response) {
-                        console.log('Server response:', response);
                         updateDistanceInfo(response.distance, response.is_within_radius);
                         showSuccess('Lokasi berhasil diperbarui');
                     },
-                    error: function(xhr, status, error) {
-                        console.error('AJAX error:', error);
-                        showError('Gagal menghitung jarak ke server');
-                        
-                        // Fallback: calculate distance manually
+                    error: function() {
                         const schoolLat = {{ $school->latitude ?? -6.8632300 }};
                         const schoolLng = {{ $school->longitude ?? 108.0491849 }};
                         const distance = calculateDistance(lat, lng, schoolLat, schoolLng);
@@ -397,30 +612,25 @@
                     }
                 });
             },
-            // Error callback
             (error) => {
-                console.error('Geolocation error:', error);
                 let message = 'Tidak dapat mengambil lokasi';
                 switch(error.code) {
                     case error.PERMISSION_DENIED:
-                        message = 'Izin lokasi ditolak. Silakan: 1) Klik ikon gembok/lock di address bar, 2) Pilih "Site settings", 3) Izinkan lokasi';
+                        message = 'Izin lokasi ditolak';
                         break;
                     case error.POSITION_UNAVAILABLE:
-                        message = 'GPS tidak aktif atau sinyal lemah. Pastikan GPS diaktifkan.';
+                        message = 'GPS tidak aktif atau sinyal lemah';
                         break;
                     case error.TIMEOUT:
-                        message = 'Waktu permintaan habis. Coba refresh halaman atau pindah lokasi.';
+                        message = 'Waktu permintaan habis';
                         break;
-                    default:
-                        message = 'Error: ' + error.message;
                 }
                 showError(message);
                 
-                // Fallback untuk testing: gunakan lokasi sekolah
-                console.log('Using fallback location for testing');
+                // Default location untuk testing
                 const schoolLat = {{ $school->latitude ?? -6.8632300 }};
                 const schoolLng = {{ $school->longitude ?? 108.0491849 }};
-                const distance = 50; // Simulasi 50 meter
+                const distance = 50; // Default 50 meter
                 const radius = {{ $school->radius ?? 100 }};
                 
                 document.getElementById('attendanceLat').value = schoolLat;
@@ -430,7 +640,7 @@
             options
         );
 
-        // Watch position for updates (optional)
+        // Setup watch position untuk update realtime
         if (watchId) {
             navigator.geolocation.clearWatch(watchId);
         }
@@ -465,9 +675,8 @@
         );
     }
 
-    // Manual distance calculation function (fallback)
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371000; // Radius bumi dalam meter
+        const R = 6371000;
         const φ1 = lat1 * Math.PI / 180;
         const φ2 = lat2 * Math.PI / 180;
         const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -481,17 +690,24 @@
         return R * c;
     }
 
-    // Handle form submission
+    function retryLocation() {
+        getLocation();
+    }
+
+    // ============================================
+    // FORM SUBMISSION
+    // ============================================
+
     document.getElementById('attendanceForm')?.addEventListener('submit', function(e) {
-        e.preventDefault(); // Prevent default untuk debugging
-        
-        console.log('Form submission started');
-        console.log('Is within radius:', isWithinRadius);
-        console.log('Current distance:', currentDistance);
-        console.log('Photo data:', photoData ? 'Yes' : 'No');
+        e.preventDefault();
         
         if (!isWithinRadius) {
             alert('Anda harus berada dalam radius sekolah untuk melakukan absensi.');
+            return false;
+        }
+        
+        if (!isAllowedTime) {
+            alert('Anda hanya dapat melakukan absensi pada jam yang telah ditentukan.');
             return false;
         }
         
@@ -505,11 +721,7 @@
             return false;
         }
         
-        // Show confirmation
-        if (confirm(`Anda berada ${Math.round(currentDistance)} meter dari sekolah. Foto selfie akan digunakan untuk validasi. Lanjutkan absensi?`)) {
-            console.log('Submitting form...');
-            
-            // Show loading state
+        if (confirm(`Anda berada ${Math.round(currentDistance)} meter dari sekolah. Lanjutkan absensi?`)) {
             const submitBtn = document.getElementById('attendanceBtn');
             const originalText = submitBtn.innerHTML;
             submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyimpan...';
@@ -522,110 +734,52 @@
         return false;
     });
 
-    // Button untuk manual retry
-    function retryLocation() {
-        console.log('Manual retry location');
-        getLocation();
-    }
+    // ============================================
+    // INITIALIZATION
+    // ============================================
 
-    // Initialize on page load
     $(document).ready(function() {
-        console.log('Document ready, initializing geolocation...');
+        console.log('Landing page initialized');
         
-        // Start camera if user is logged in and can attend
+        // Update timezone info setiap detik
+        updateTimezoneInfo();
+        setInterval(updateTimezoneInfo, 1000);
+        
+        // Start camera jika user login dan belum absen
         @if(session()->has('user_id') && !$hasAttendedToday)
+            console.log('Starting camera for attendance...');
             startCamera();
         @endif
         
-        // Event listeners for camera buttons
+        // Setup camera buttons
         document.getElementById('captureBtn')?.addEventListener('click', capturePhoto);
         document.getElementById('retakeBtn')?.addEventListener('click', retakePhoto);
         
-        // Tunggu sedikit sebelum request lokasi
+        // Load time settings pertama kali
+        console.log('Loading initial time settings...');
+        loadTimeSettings();
+        
+        // Refresh time settings setiap 30 detik
+        setInterval(loadTimeSettings, 30000);
+        
+        // Get location setelah 1 detik
         setTimeout(function() {
+            console.log('Getting location...');
             getLocation();
         }, 1000);
         
-        // Tambah button retry
+        // Add control buttons
         $('#distanceInfo').append(`
             <div class="mt-3">
-                <button onclick="retryLocation()" class="btn btn-sm btn-outline-light">
+                <button onclick="retryLocation()" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-arrow-clockwise"></i> Refresh Lokasi
                 </button>
-                <button onclick="testLocation()" class="btn btn-sm btn-outline-light ms-2">
-                    <i class="bi bi-geo"></i> Test Lokasi
+                <button onclick="loadTimeSettings()" class="btn btn-sm btn-outline-primary ms-2">
+                    <i class="bi bi-clock"></i> Refresh Waktu
                 </button>
             </div>
         `);
     });
-
-    // Function untuk testing lokasi
-    function testLocation() {
-        console.log('Testing geolocation support...');
-        console.log('navigator.geolocation:', navigator.geolocation);
-        
-        // Test dengan lokasi dummy
-        const dummyLat = -6.8632300;
-        const dummyLng = 108.0491849;
-        const distance = Math.random() * 200; // Random distance 0-200m
-        
-        document.getElementById('attendanceLat').value = dummyLat;
-        document.getElementById('attendanceLng').value = dummyLng;
-        document.getElementById('attendanceDistance').value = distance;
-        
-        updateDistanceInfo(distance, distance <= 100);
-        showSuccess('Test lokasi berhasil (data dummy)');
-    }
 </script>
 @endpush
-
-{{-- Debug info --}}
-@if(env('APP_DEBUG'))
-<div class="mt-4">
-    <details>
-        <summary class="btn btn-sm btn-outline-info">Debug Info</summary>
-        <div class="alert alert-warning mt-2">
-            <small>
-                <strong>Session Status:</strong> 
-                @if(session()->has('user_id'))
-                    Logged in as {{ session('user_name') }} ({{ session('user_role') }})
-                @else
-                    Not logged in
-                @endif
-                <br>
-                
-                <strong>School Configuration:</strong>
-                @if($school)
-                    <span id="schoolInfo">
-                        {{ $school->name }}<br>
-                        Lat: {{ $school->latitude }}, Lng: {{ $school->longitude }}, Radius: {{ $school->radius }}m
-                    </span>
-                @else
-                    <span class="text-danger">School not configured!</span>
-                @endif
-                <br>
-                
-                <strong>Today's Date:</strong> {{ now()->toDateString() }}<br>
-                
-                <strong>Has Attended Today:</strong> {{ $hasAttendedToday ? 'Yes' : 'No' }}<br>
-                
-                <strong>Geolocation Test:</strong>
-                <button onclick="testGeolocationSupport()" class="btn btn-sm btn-outline-dark">Test Support</button>
-                <div id="geolocationTestResult" class="mt-1"></div>
-            </small>
-        </div>
-    </details>
-</div>
-
-<script>
-    function testGeolocationSupport() {
-        const resultDiv = document.getElementById('geolocationTestResult');
-        if (navigator.geolocation) {
-            resultDiv.innerHTML = '<span class="text-success">✓ Geolocation supported</span>';
-        } else {
-            resultDiv.innerHTML = '<span class="text-danger">✗ Geolocation not supported</span>';
-        }
-    }
-</script>
-@endif
 @endsection

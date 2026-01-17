@@ -105,7 +105,61 @@
                        class="btn btn-outline-info btn-lg">
                         <i class="bi bi-calendar-check"></i> Lihat Absensi
                     </a>
+                    <a href="{{ route('admin.time.settings') }}" class="btn btn-outline-warning btn-lg">
+                        <i class="bi bi-clock"></i> Kelola Waktu Absen
+                    </a>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Time Settings -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Waktu Absen Aktif</h5>
+            </div>
+            <div class="card-body">
+                @if($timeSettings->count() > 0)
+                    <div class="row">
+                        @foreach($timeSettings as $setting)
+                            <div class="col-md-3 mb-3">
+                                <div class="card h-100 border-{{ $setting->type == 'masuk' ? 'primary' : 'success' }}">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title">{{ $setting->name }}</h5>
+                                        <h2 class="display-6">{{ $setting->start_time->format('H:i') }} - {{ $setting->end_time->format('H:i') }}</h2>
+                                        <span class="badge bg-{{ $setting->type == 'masuk' ? 'primary' : 'success' }}">
+                                            {{ ucfirst($setting->type) }}
+                                        </span>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                Durasi: {{ $setting->start_time->diffInHours($setting->end_time) }} jam
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="alert alert-light mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Total {{ $timeSettings->count() }} waktu absen aktif</strong> |
+                        Masuk: {{ $timeSettings->where('type', 'masuk')->count() }} |
+                        Pulang: {{ $timeSettings->where('type', 'pulang')->count() }}
+                    </div>
+                @else
+                    <div class="text-center py-3">
+                        <i class="bi bi-clock display-1 text-muted"></i>
+                        <h4 class="mt-3">Belum ada waktu absen aktif</h4>
+                        <p class="text-muted">
+                            <a href="{{ route('admin.time.settings') }}" class="btn btn-warning">
+                                <i class="bi bi-plus-circle"></i> Tambah Waktu Absen
+                            </a>
+                        </p>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -127,6 +181,7 @@
                                 <th>Role</th>
                                 <th>Tanggal</th>
                                 <th>Waktu</th>
+                                <th>Tipe</th>
                                 <th>Jarak</th>
                                 <th>Status</th>
                             </tr>
@@ -142,6 +197,11 @@
                                     </td>
                                     <td>{{ $attendance->date->format('d/m/Y') }}</td>
                                     <td>{{ $attendance->time }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ $attendance->attendance_type === 'masuk' ? 'primary' : 'success' }}">
+                                            {{ ucfirst($attendance->attendance_type) }}
+                                        </span>
+                                    </td>
                                     <td>{{ number_format($attendance->distance, 0) }} m</td>
                                     <td>
                                         <span class="status-badge status-{{ strtolower($attendance->status) }}">
@@ -151,7 +211,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center">Belum ada data absensi</td>
+                                    <td colspan="7" class="text-center">Belum ada data absensi</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -166,4 +226,92 @@
         </div>
     </div>
 </div>
+
+<!-- Current Time Info -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-clock"></i> Waktu Server Saat Ini</h5>
+            </div>
+            <div class="card-body text-center">
+                <h2 id="serverTime" class="display-4">{{ now()->format('H:i:s') }}</h2>
+                <p class="text-muted mb-0">{{ now()->format('d F Y') }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Status Absensi Hari Ini</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    <div class="row">
+                        <div class="col-6">
+                            <h3>{{ $absensiHariIni }}</h3>
+                            <small class="text-muted">Total Absensi</small>
+                        </div>
+                        <div class="col-6">
+                            <h3>{{ $absensiValid }}</h3>
+                            <small class="text-muted">Absensi Valid</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div>
+                        <small class="text-muted">Terakhir update: {{ now()->format('H:i:s') }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
+
+@push('styles')
+<style>
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.85em;
+}
+.status-valid {
+    background-color: #d4edda;
+    color: #155724;
+}
+.status-invalid {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+</style>
+@endpush
+
+@push('scripts')
+<script>
+    function updateServerTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('id-ID', { 
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
+        const dateString = now.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        document.getElementById('serverTime').textContent = timeString;
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        updateServerTime();
+        setInterval(updateServerTime, 1000);
+    });
+</script>
+@endpush

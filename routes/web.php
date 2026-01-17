@@ -5,7 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AdminController;
 
-// Landing Page - accessible to everyone
+// Landing Page
 Route::get('/', function () {
     $school = \App\Models\School::first();
     $userRole = session('user_role');
@@ -31,8 +31,9 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Attendance Routes
 Route::post('/hadir', [AttendanceController::class, 'hadir'])->name('hadir');
 Route::post('/get-distance', [AttendanceController::class, 'getDistance'])->name('get.distance');
+Route::post('/check-attendance-time', [AttendanceController::class, 'checkAttendanceTime'])->name('check.attendance.time');
 
-// Admin Routes - PROTECTED manually without middleware
+// Admin Routes
 Route::prefix('admin')->group(function () {
     // Dashboard
     Route::get('/', [AdminController::class, 'dashboard'])->name('admin.dashboard');
@@ -50,6 +51,25 @@ Route::prefix('admin')->group(function () {
     
     // School Configuration
     Route::post('/school/update', [AdminController::class, 'updateSchool'])->name('admin.school.update');
+    
+    // Attendance Time Settings
+    Route::get('/attendance-time-settings', [AdminController::class, 'attendanceTimeSettings'])->name('admin.time.settings');
+    Route::post('/attendance-time-settings/create', [AdminController::class, 'createTimeSetting'])->name('admin.time.settings.create');
+    Route::post('/attendance-time-settings/update/{id}', [AdminController::class, 'updateTimeSetting'])->name('admin.time.settings.update');
+    Route::delete('/attendance-time-settings/delete/{id}', [AdminController::class, 'deleteTimeSetting'])->name('admin.time.settings.delete');
+    Route::get('/get-active-time-settings', [AdminController::class, 'getActiveTimeSettings'])->name('admin.get.time.settings');
+    
+    // Debug Route
+    Route::get('/debug-time', [AdminController::class, 'debugTime'])->name('admin.debug.time');
+});
+
+// Simple test route (tanpa auth)
+Route::get('/test-time', function() {
+    return response()->json([
+        'time' => now()->format('Y-m-d H:i:s'),
+        'day' => now()->dayOfWeekIso,
+        'day_name' => now()->translatedFormat('l')
+    ]);
 });
 
 // Catch-all untuk admin routes yang tidak valid
