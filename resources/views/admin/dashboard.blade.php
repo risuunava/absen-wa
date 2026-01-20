@@ -111,7 +111,7 @@
                     <p class="text-xs text-gray-500">Jarak maksimal dari sekolah untuk absensi valid</p>
                 </div>
                 
-                <button type="submit" class="w-full flex items-center justify-center space-x-2 gradient-bg text-white py-3 rounded-xl hover:opacity-90 transition-opacity text-sm font-semibold hover-lift">
+                <button type="submit" class="w-full flex items-center justify-center space-x-2 gradient-bg text-black py-3 rounded-xl hover:opacity-90 transition-opacity text-sm font-semibold hover-lift">
                     <i class="bi bi-save"></i>
                     <span>Simpan Perubahan</span>
                 </button>

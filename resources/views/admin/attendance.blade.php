@@ -21,6 +21,8 @@
     </div>
 
     <!-- Alert Messages -->
+    <div id="ajaxAlert" class="mb-6 hidden"></div>
+
     @if(session('success'))
         <div class="mb-6 animate-fade-in">
             <div class="bg-green-50 border border-green-200 rounded-xl p-4">
@@ -79,7 +81,7 @@
                     <i class="bi bi-check-circle text-green-600 mobile-icon-lg"></i>
                 </div>
                 <div class="ml-4">
-                    <div class="text-2xl font-bold text-gray-900">{{ $attendances->where('photo_verified', true)->count() }}</div>
+                    <div class="text-2xl font-bold text-gray-900" id="verifiedCount">{{ $attendances->where('photo_verified', true)->count() }}</div>
                     <div class="text-sm text-gray-600">Foto Terverifikasi</div>
                 </div>
             </div>
@@ -91,7 +93,7 @@
                     <i class="bi bi-clock-history text-yellow-600 mobile-icon-lg"></i>
                 </div>
                 <div class="ml-4">
-                    <div class="text-2xl font-bold text-gray-900">{{ $attendances->where('selfie_photo', '!=', null)->where('photo_verified', false)->count() }}</div>
+                    <div class="text-2xl font-bold text-gray-900" id="pendingCount">{{ $attendances->where('selfie_photo', '!=', null)->where('photo_verified', false)->count() }}</div>
                     <div class="text-sm text-gray-600">Menunggu Verifikasi</div>
                 </div>
             </div>
@@ -103,7 +105,7 @@
                     <i class="bi bi-x-circle text-gray-600 mobile-icon-lg"></i>
                 </div>
                 <div class="ml-4">
-                    <div class="text-2xl font-bold text-gray-900">{{ $attendances->where('selfie_photo', null)->count() }}</div>
+                    <div class="text-2xl font-bold text-gray-900" id="noPhotoCount">{{ $attendances->where('selfie_photo', null)->count() }}</div>
                     <div class="text-sm text-gray-600">Tanpa Foto</div>
                 </div>
             </div>
@@ -244,9 +246,9 @@
                             <th class="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-100" id="attendanceTableBody">
                         @foreach($attendances as $index => $attendance)
-                        <tr class="hover:bg-gray-50/50 transition-colors duration-150">
+                        <tr class="hover:bg-gray-50/50 transition-colors duration-150" id="row-{{ $attendance->id }}">
                             <td class="py-4 px-4 text-sm text-gray-900 font-medium text-center">{{ $index + 1 }}</td>
                             
                             <td class="py-4 px-4">
@@ -286,7 +288,8 @@
                                     @endphp
                                     @if($fileExists)
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                            {{ $attendance->photo_verified ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200' }}">
+                                            {{ $attendance->photo_verified ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200' }}" 
+                                            id="photoStatus-{{ $attendance->id }}">
                                             <i class="bi {{ $attendance->photo_verified ? 'bi-check-circle' : 'bi-clock' }} mr-1"></i>
                                             {{ $attendance->photo_verified ? 'Terverifikasi' : 'Pending' }}
                                         </span>
@@ -394,9 +397,9 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-gray-600">
                     <div>
                         <strong class="text-gray-900">Ringkasan:</strong> 
-                        Foto terverifikasi: <span class="font-medium text-gray-900">{{ $attendances->where('photo_verified', true)->count() }}</span> • 
-                        Menunggu verifikasi: <span class="font-medium text-gray-900">{{ $attendances->where('selfie_photo', '!=', null)->where('photo_verified', false)->count() }}</span> • 
-                        Tanpa foto: <span class="font-medium text-gray-900">{{ $attendances->where('selfie_photo', null)->count() }}</span>
+                        Foto terverifikasi: <span class="font-medium text-gray-900" id="summaryVerified">{{ $attendances->where('photo_verified', true)->count() }}</span> • 
+                        Menunggu verifikasi: <span class="font-medium text-gray-900" id="summaryPending">{{ $attendances->where('selfie_photo', '!=', null)->where('photo_verified', false)->count() }}</span> • 
+                        Tanpa foto: <span class="font-medium text-gray-900" id="summaryNoPhoto">{{ $attendances->where('selfie_photo', null)->count() }}</span>
                     </div>
                     <div class="text-xs">
                         Data diperbarui: {{ now()->format('d/m/Y H:i') }}
@@ -433,6 +436,224 @@ document.addEventListener('DOMContentLoaded', function() {
         dateInput.value = new Date().toISOString().split('T')[0];
     }
 });
+
+// Function to show alert message
+function showAlert(type, message) {
+    const alertDiv = document.getElementById('ajaxAlert');
+    if (!alertDiv) return;
+    
+    let bgColor = '', textColor = '', icon = '';
+    switch(type) {
+        case 'success':
+            bgColor = 'bg-green-50';
+            textColor = 'text-green-800';
+            icon = 'bi-check-circle text-green-600';
+            break;
+        case 'error':
+            bgColor = 'bg-red-50';
+            textColor = 'text-red-800';
+            icon = 'bi-exclamation-circle text-red-600';
+            break;
+        case 'warning':
+            bgColor = 'bg-yellow-50';
+            textColor = 'text-yellow-800';
+            icon = 'bi-exclamation-triangle text-yellow-600';
+            break;
+        default:
+            bgColor = 'bg-blue-50';
+            textColor = 'text-blue-800';
+            icon = 'bi-info-circle text-blue-600';
+    }
+    
+    alertDiv.innerHTML = `
+        <div class="${bgColor} border ${type === 'success' ? 'border-green-200' : type === 'error' ? 'border-red-200' : 'border-yellow-200'} rounded-xl p-4 animate-fade-in">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="bi ${icon} mobile-icon-md"></i>
+                </div>
+                <div class="ml-3 flex-1">
+                    <p class="text-sm font-medium ${textColor}">${message}</p>
+                </div>
+                <button type="button" onclick="this.parentElement.parentElement.remove()" 
+                        class="ml-4 ${textColor} hover:opacity-80">
+                    <i class="bi bi-x mobile-icon-md"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    alertDiv.classList.remove('hidden');
+    
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.innerHTML) {
+            alertDiv.innerHTML = '';
+            alertDiv.classList.add('hidden');
+        }
+    }, 5000);
+}
+
+// Function to update statistics
+function updateStatistics(attendanceId) {
+    // Update photo status in the table row
+    const photoStatus = document.getElementById(`photoStatus-${attendanceId}`);
+    if (photoStatus) {
+        photoStatus.innerHTML = '<i class="bi bi-check-circle mr-1"></i>Terverifikasi';
+        photoStatus.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200';
+    }
+    
+    // Update counters
+    const verifiedCount = document.getElementById('verifiedCount');
+    const pendingCount = document.getElementById('pendingCount');
+    const summaryVerified = document.getElementById('summaryVerified');
+    const summaryPending = document.getElementById('summaryPending');
+    
+    if (verifiedCount) {
+        let currentCount = parseInt(verifiedCount.textContent) || 0;
+        verifiedCount.textContent = currentCount + 1;
+    }
+    
+    if (pendingCount) {
+        let currentCount = parseInt(pendingCount.textContent) || 0;
+        if (currentCount > 0) {
+            pendingCount.textContent = currentCount - 1;
+        }
+    }
+    
+    if (summaryVerified) {
+        let currentCount = parseInt(summaryVerified.textContent) || 0;
+        summaryVerified.textContent = currentCount + 1;
+    }
+    
+    if (summaryPending) {
+        let currentCount = parseInt(summaryPending.textContent) || 0;
+        if (currentCount > 0) {
+            summaryPending.textContent = currentCount - 1;
+        }
+    }
+}
+
+// Function to verify photo using AJAX
+async function verifyPhoto(attendanceId) {
+    if (!confirm('Anda yakin ingin memverifikasi foto ini?')) {
+        return;
+    }
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        
+        // Show loading
+        const verifyButton = event?.target || document.querySelector(`button[onclick*="${attendanceId}"]`);
+        const originalText = verifyButton?.innerHTML || '';
+        if (verifyButton) {
+            verifyButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Memproses...';
+            verifyButton.disabled = true;
+        }
+
+        // Send AJAX request
+        const response = await fetch(`/admin/attendance/${attendanceId}/verify-photo`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ _method: 'POST' })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showAlert('success', result.message);
+            updateStatistics(attendanceId);
+            
+            // Close modal if open
+            const modal = document.getElementById('detailModalOverlay');
+            if (modal) {
+                modal.remove();
+            }
+            
+        } else {
+            throw new Error(result.message || 'Gagal memverifikasi foto');
+        }
+
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('error', 'Gagal memverifikasi foto: ' + error.message);
+        
+        // Reset button
+        if (verifyButton) {
+            verifyButton.innerHTML = originalText;
+            verifyButton.disabled = false;
+        }
+    }
+}
+
+// Function to delete attendance using AJAX
+async function deleteAttendance(attendanceId) {
+    if (!confirm('Anda yakin ingin menghapus data absensi ini? Tindakan ini tidak dapat dibatalkan.')) {
+        return;
+    }
+
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        
+        // Send AJAX request
+        const response = await fetch(`/admin/attendance/${attendanceId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showAlert('success', result.message);
+            
+            // Remove row from table
+            const row = document.getElementById(`row-${attendanceId}`);
+            if (row) {
+                row.style.transition = 'all 0.3s ease';
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(-20px)';
+                
+                setTimeout(() => {
+                    row.remove();
+                    
+                    // Update total count
+                    const totalCount = document.querySelector('.glass-card .text-lg.font-bold');
+                    if (totalCount) {
+                        let currentCount = parseInt(totalCount.textContent) || 0;
+                        if (currentCount > 0) {
+                            totalCount.textContent = currentCount - 1;
+                        }
+                    }
+                    
+                    // Show empty state if no rows left
+                    const tableBody = document.getElementById('attendanceTableBody');
+                    if (tableBody && tableBody.children.length === 0) {
+                        location.reload(); // Reload to show empty state
+                    }
+                }, 300);
+            }
+            
+            // Close modal if open
+            const modal = document.getElementById('detailModalOverlay');
+            if (modal) {
+                modal.remove();
+            }
+            
+        } else {
+            throw new Error(result.message || 'Gagal menghapus data');
+        }
+
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('error', 'Gagal menghapus data: ' + error.message);
+    }
+}
 
 // Function to create modal overlay
 function createModalOverlay(content, size = 'max-w-2xl') {
@@ -537,14 +758,12 @@ function showDetailModal(id, name, userId, role, date, time, status, distance, i
                          onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjI0MCIgdmlld0JveD0iMCAwIDMyMCAyNDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjMyMCIgaGVpZ2h0PSIyNDAiIGZpbGw9IiNFNUU1RTUiLz48cGF0aCBkPSJNMTYwIDE0MEMxMzQuNCAxNDAgMTE0IDE2MC40IDExNCAxODZDMTE0IDIxMS42IDEzNC40IDIzMiAxNjAgMjMyQzE4NS42IDIzMiAyMDYgMjExLjYgMjA2IDE4NkMyMDYgMTYwLjQgMTg1LjYgMTQwIDE2MCAxNDBaTTI2MCAyMEg2MEM0OC45NTQzIDIwIDQwIDI4Ljk1NDMgNDAgNDBWMjAwQzQwIDIxMS4wNDYgNDguOTU0MyAyMjAgNjAgMjIwSDI2MEMyNzEuMDQ2IDIyMCAyODAgMjExLjA0NiAyODAgMjAwVjQwQzI4MCAyOC45NTQzIDI3MS4wNDYgMjAgMjYwIDIwWiIgZmlsbD0iI0I4QjhCOCIvPjwvc3ZnPg=='">
                 </div>
                 ${!isVerifiedBool ? `
-                    <form action="/admin/verify-photo/${id}" method="POST" class="mt-2">
-                        @csrf
-                        <button type="submit" 
-                                class="w-full btn-success px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2">
-                            <i class="bi bi-check-circle"></i>
-                            Verifikasi Foto Ini
-                        </button>
-                    </form>
+                    <button type="button" 
+                            onclick="verifyPhoto('${id}')"
+                            class="w-full btn-success px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2">
+                        <i class="bi bi-check-circle"></i>
+                        Verifikasi Foto Ini
+                    </button>
                 ` : ''}
             </div>
         `;
@@ -646,7 +865,7 @@ function showDetailModal(id, name, userId, role, date, time, status, distance, i
                 </button>
                 
                 <button type="button" 
-                        onclick="showDeleteModal('${id}', '${name.replace(/'/g, "\\'")}', '${date}', '${time}', '${role}')"
+                        onclick="deleteAttendance('${id}')"
                         class="btn-danger px-4 py-2.5 text-sm font-medium flex-1 flex items-center justify-center gap-2">
                     <i class="bi bi-trash"></i>
                     Hapus Absensi
@@ -733,15 +952,12 @@ function showDeleteModal(id, name, date, time, role) {
                     Batalkan
                 </button>
                 
-                <form action="/admin/attendance/${id}" method="POST" class="contents">
-                    <input type="hidden" name="_token" value="${csrfToken}">
-                    <input type="hidden" name="_method" value="DELETE">
-                    <button type="submit" 
-                            class="btn-danger px-4 py-2.5 text-sm font-medium flex-1 flex items-center justify-center gap-2">
-                        <i class="bi bi-trash"></i>
-                        Ya, Hapus Data
-                    </button>
-                </form>
+                <button type="button" 
+                        onclick="deleteAttendance('${id}')"
+                        class="btn-danger px-4 py-2.5 text-sm font-medium flex-1 flex items-center justify-center gap-2">
+                    <i class="bi bi-trash"></i>
+                    Ya, Hapus Data
+                </button>
             </div>
         </div>
     `;

@@ -248,10 +248,7 @@
             transform: scale(0.95);
         }
         
-        .mobile-menu {
-            display: none;
-        }
-        
+        /* MOBILE NAVIGATION STYLES */
         @media (max-width: 768px) {
             .desktop-only {
                 display: none !important;
@@ -261,7 +258,8 @@
                 display: block !important;
             }
             
-            .mobile-menu {
+            /* MOBILE BOTTOM NAVIGATION */
+            .mobile-bottom-nav {
                 display: flex;
                 position: fixed;
                 bottom: 0;
@@ -271,30 +269,74 @@
                 border-top: 1px solid var(--medium-gray);
                 padding: 0.75rem 1rem;
                 z-index: 1000;
+                height: 60px;
+                align-items: center;
             }
             
-            .mobile-menu-item {
+            .mobile-bottom-nav .nav-container {
+                display: flex;
+                width: 100%;
+                justify-content: space-around;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            
+            .mobile-bottom-nav .nav-item {
                 flex: 1;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                gap: 0.25rem;
                 padding: 0.5rem;
                 color: var(--dark-gray);
                 text-decoration: none;
                 font-size: 0.75rem;
                 border-radius: 8px;
                 transition: all 0.2s ease;
+                min-height: 40px;
             }
             
-            .mobile-menu-item.active {
+            .mobile-bottom-nav .nav-item.active {
                 color: var(--primary-black);
                 background: var(--light-gray);
             }
             
-            .mobile-menu-item:active {
+            .mobile-bottom-nav .nav-item:active {
                 background: var(--medium-gray);
+            }
+            
+            .mobile-bottom-nav .nav-item i {
+                font-size: 1.1rem;
+                margin-bottom: 3px;
+            }
+            
+            /* Adjust main content for bottom navigation */
+            .mobile-bottom-safe {
+                padding-bottom: 70px !important;
+            }
+        }
+        
+        /* TABLET NAVIGATION (768px - 1024px) */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .mobile-only {
+                display: none !important;
+            }
+            
+            .desktop-only {
+                display: block !important;
+            }
+            
+            /* Tablet: Gunakan navbar desktop tapi lebih compact */
+            .desktop-only nav {
+                padding: 0.5rem 1rem;
+            }
+            
+            .desktop-only nav h1 {
+                font-size: 0.875rem;
+            }
+            
+            .desktop-only nav p {
+                font-size: 0.7rem;
             }
         }
         
@@ -315,6 +357,22 @@
         .mobile-top-safe {
             padding-top: env(safe-area-inset-top, 1rem);
         }
+        
+        /* User name truncation */
+        .username-truncate {
+            max-width: 80px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+        }
+        
+        @media (max-width: 640px) {
+            .username-truncate {
+                max-width: 60px;
+                font-size: 0.7rem;
+            }
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -327,7 +385,7 @@
         <div id="mobileTime" class="font-medium"></div>
     </div>
 
-    <!-- Navigation -->
+    <!-- DESKTOP & TABLET NAVIGATION (tampil di 769px+) -->
     <nav class="bg-white/95 backdrop-blur-lg border-b border-gray-100 sticky top-0 z-50 desktop-only">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
@@ -342,7 +400,7 @@
                     </div>
                 </div>
 
-                <!-- Desktop Menu -->
+                <!-- Desktop & Tablet Menu -->
                 <div class="flex items-center gap-4">
                     @if(session()->has('user_id'))
                         <!-- User Info -->
@@ -362,11 +420,16 @@
                             </div>
                         </div>
 
-                        <!-- Admin Dashboard Link -->
+                        <!-- Dashboard Link untuk semua user yang login -->
                         @if(session('user_role') === 'admin')
-                            <a href="/admin" class="hidden md:inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-50">
+                            <a href="/admin" class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-50">
                                 <i class="bi bi-speedometer2"></i>
                                 <span>Dashboard</span>
+                            </a>
+                        @else
+                            <a href="/" class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-gray-50">
+                                <i class="bi bi-house"></i>
+                                <span>Beranda</span>
                             </a>
                         @endif
 
@@ -433,45 +496,49 @@
         @yield('content')
     </main>
 
-    <!-- Mobile Bottom Menu -->
+    <!-- MOBILE BOTTOM NAVIGATION (hanya tampil di ≤768px) -->
     @if(session()->has('user_id'))
-    <nav class="mobile-menu mobile-only">
-        <a href="/" class="mobile-menu-item {{ Request::is('/') ? 'active' : '' }}">
-            <i class="bi bi-house mobile-icon-md"></i>
-            <span>Beranda</span>
-        </a>
-        
-        @if(session('user_role') === 'admin')
-        <a href="/admin" class="mobile-menu-item {{ Request::is('admin*') ? 'active' : '' }}">
-            <i class="bi bi-speedometer2 mobile-icon-md"></i>
-            <span>Dashboard</span>
-        </a>
-        @endif
-        
-        <div class="mobile-menu-item">
-            <i class="bi bi-person mobile-icon-md"></i>
-            <span class="truncate max-w-[80px]">{{ session('user_name') }}</span>
+    <nav class="mobile-bottom-nav mobile-only">
+        <div class="nav-container">
+            <a href="/" class="nav-item {{ Request::is('/') ? 'active' : '' }}">
+                <i class="bi bi-house"></i>
+                <span>Beranda</span>
+            </a>
+            
+            @if(session('user_role') === 'admin')
+            <a href="/admin" class="nav-item {{ Request::is('admin*') ? 'active' : '' }}">
+                <i class="bi bi-speedometer2"></i>
+                <span>Dashboard</span>
+            </a>
+            @else
+            <div class="nav-item">
+                <i class="bi bi-person"></i>
+                <span class="username-truncate">{{ session('user_name') }}</span>
+            </div>
+            @endif
+            
+            <form action="{{ route('logout') }}" method="POST" class="contents">
+                @csrf
+                <button type="submit" class="nav-item">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Keluar</span>
+                </button>
+            </form>
         </div>
-        
-        <form action="{{ route('logout') }}" method="POST" class="contents">
-            @csrf
-            <button type="submit" class="mobile-menu-item">
-                <i class="bi bi-box-arrow-right mobile-icon-md"></i>
-                <span>Keluar</span>
-            </button>
-        </form>
     </nav>
     @else
-    <nav class="mobile-menu mobile-only">
-        <a href="/" class="mobile-menu-item {{ Request::is('/') ? 'active' : '' }}">
-            <i class="bi bi-house mobile-icon-md"></i>
-            <span>Beranda</span>
-        </a>
-        
-        <a href="{{ route('login') }}" class="mobile-menu-item {{ Request::is('login*') ? 'active' : '' }}">
-            <i class="bi bi-box-arrow-in-right mobile-icon-md"></i>
-            <span>Login</span>
-        </a>
+    <nav class="mobile-bottom-nav mobile-only">
+        <div class="nav-container">
+            <a href="/" class="nav-item {{ Request::is('/') ? 'active' : '' }}">
+                <i class="bi bi-house"></i>
+                <span>Beranda</span>
+            </a>
+            
+            <a href="{{ route('login') }}" class="nav-item {{ Request::is('login*') ? 'active' : '' }}">
+                <i class="bi bi-box-arrow-in-right"></i>
+                <span>Login</span>
+            </a>
+        </div>
     </nav>
     @endif
 
@@ -554,6 +621,29 @@
             }
             lastTouchEnd = now;
         }, false);
+        
+        // Check screen size and hide/show appropriate menus
+        function checkScreenSize() {
+            const isMobile = window.innerWidth <= 768;
+            const mobileElements = document.querySelectorAll('.mobile-only');
+            const desktopElements = document.querySelectorAll('.desktop-only');
+            
+            if (isMobile) {
+                // Show mobile elements, hide desktop
+                mobileElements.forEach(el => el.style.display = 'block');
+                desktopElements.forEach(el => el.style.display = 'none');
+            } else {
+                // Show desktop elements, hide mobile
+                mobileElements.forEach(el => el.style.display = 'none');
+                desktopElements.forEach(el => el.style.display = 'block');
+            }
+        }
+        
+        // Initial check
+        checkScreenSize();
+        
+        // Check on resize
+        window.addEventListener('resize', checkScreenSize);
     </script>
 </body>
 </html>
