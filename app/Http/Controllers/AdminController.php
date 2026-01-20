@@ -284,9 +284,64 @@ class AdminController extends Controller
     }
 
     public function createTimeSetting(Request $request)
-    {
-        $check = $this->checkAdmin();
-        if ($check) return $check;
+{
+    $check = $this->checkAdmin();
+    if ($check) return $check;
+
+    $request->validate([
+        'name' => 'required|string|max:100',
+        'start_time' => 'required|date_format:H:i',
+        'end_time' => 'required|date_format:H:i',
+        'type' => 'required|in:masuk,pulang,lainnya',
+        'days_of_week' => 'nullable|array',
+        'days_of_week.*' => 'integer|min:1|max:7',
+        'description' => 'nullable|string|max:255',
+        'is_active' => 'sometimes|boolean' // Ubah juga di sini
+    ]);
+
+    // Validasi waktu
+    if ($request->start_time >= $request->end_time && $request->end_time != '00:00') {
+        return back()->with('error', 'Waktu mulai harus lebih awal dari waktu berakhir.');
+    }
+
+    // Handle days_of_week - encode sebagai JSON
+    $daysOfWeek = null;
+    if ($request->filled('days_of_week')) {
+        $daysOfWeek = json_encode($request->days_of_week);
+    }
+
+    // FIX: Perbaiki cara mengambil is_active
+    $isActive = false;
+    if ($request->has('is_active')) {
+        $isActive = $request->input('is_active') == '1' || 
+                    $request->input('is_active') === true || 
+                    $request->input('is_active') === 1;
+    }
+
+    AttendanceTimeSetting::create([
+        'name' => $request->name,
+        'start_time' => $request->start_time,
+        'end_time' => $request->end_time,
+        'type' => $request->type,
+        'days_of_week' => $daysOfWeek,
+        'description' => $request->description,
+        'is_active' => $isActive
+    ]);
+
+    return back()->with('success', 'Pengaturan waktu absen berhasil dibuat.');
+}
+
+    public function updateTimeSetting(Request $request, $id)
+{
+    $check = $this->checkAdmin();
+    if ($check) return $check;
+
+    try {
+        // Cek apakah request AJAX
+        $isAjax = $request->ajax() || 
+                  $request->wantsJson() || 
+                  $request->header('X-Requested-With') == 'XMLHttpRequest' ||
+                  $request->expectsJson();
 
         $request->validate([
             'name' => 'required|string|max:100',
@@ -296,50 +351,17 @@ class AdminController extends Controller
             'days_of_week' => 'nullable|array',
             'days_of_week.*' => 'integer|min:1|max:7',
             'description' => 'nullable|string|max:255',
-            'is_active' => 'boolean'
+            'is_active' => 'sometimes|boolean' // Ubah ke 'sometimes'
         ]);
 
         // Validasi waktu
         if ($request->start_time >= $request->end_time && $request->end_time != '00:00') {
-            return back()->with('error', 'Waktu mulai harus lebih awal dari waktu berakhir.');
-        }
-
-        // Handle days_of_week - encode sebagai JSON
-        $daysOfWeek = null;
-        if ($request->filled('days_of_week')) {
-            $daysOfWeek = json_encode($request->days_of_week);
-        }
-
-        AttendanceTimeSetting::create([
-            'name' => $request->name,
-            'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
-            'type' => $request->type,
-            'days_of_week' => $daysOfWeek,
-            'description' => $request->description,
-            'is_active' => $request->has('is_active')
-        ]);
-
-        return back()->with('success', 'Pengaturan waktu absen berhasil dibuat.');
-    }
-
-    public function updateTimeSetting(Request $request, $id)
-    {
-        $check = $this->checkAdmin();
-        if ($check) return $check;
-
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i',
-            'type' => 'required|in:masuk,pulang,lainnya',
-            'days_of_week' => 'nullable|array',
-            'days_of_week.*' => 'integer|min:1|max:7',
-            'description' => 'nullable|string|max:255',
-            'is_active' => 'boolean'
-        ]);
-
-        if ($request->start_time >= $request->end_time && $request->end_time != '00:00') {
+            if ($isAjax) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Waktu mulai harus lebih awal dari waktu berakhir.'
+                ], 422);
+            }
             return back()->with('error', 'Waktu mulai harus lebih awal dari waktu berakhir.');
         }
 
@@ -351,6 +373,15 @@ class AdminController extends Controller
             $daysOfWeek = json_encode($request->days_of_week);
         }
         
+        // FIX: Perbaiki cara mengambil is_active
+        // Jika is_active ada di request, konversi ke boolean
+        $isActive = false;
+        if ($request->has('is_active')) {
+            $isActive = $request->input('is_active') == '1' || 
+                        $request->input('is_active') === true || 
+                        $request->input('is_active') === 1;
+        }
+        
         $setting->update([
             'name' => $request->name,
             'start_time' => $request->start_time,
@@ -358,11 +389,47 @@ class AdminController extends Controller
             'type' => $request->type,
             'days_of_week' => $daysOfWeek,
             'description' => $request->description,
-            'is_active' => $request->has('is_active')
+            'is_active' => $isActive // Gunakan nilai yang sudah dikonversi
         ]);
 
+        if ($isAjax) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengaturan waktu absen berhasil diperbarui.',
+                'setting' => [
+                    'id' => $setting->id,
+                    'name' => $setting->name,
+                    'start_time' => $setting->start_time->format('H:i'),
+                    'end_time' => $setting->end_time->format('H:i'),
+                    'type' => $setting->type,
+                    'description' => $setting->description,
+                    'is_active' => $setting->is_active,
+                    'days_of_week' => $daysOfWeek
+                ]
+            ]);
+        }
+
         return back()->with('success', 'Pengaturan waktu absen berhasil diperbarui.');
+        
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        if ($isAjax) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $e->errors()
+            ], 422);
+        }
+        throw $e;
+    } catch (\Exception $e) {
+        if ($isAjax) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperbarui pengaturan: ' . $e->getMessage()
+            ], 500);
+        }
+        return back()->with('error', 'Gagal memperbarui pengaturan: ' . $e->getMessage());
     }
+}
 
     public function deleteTimeSetting($id)
     {

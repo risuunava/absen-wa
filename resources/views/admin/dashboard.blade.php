@@ -3,290 +3,331 @@
 @section('title', 'Dashboard Admin')
 
 @section('content')
-<div class="row">
-    <div class="col-12">
-        <h1 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard Admin</h1>
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Dashboard Admin</h1>
+            <p class="text-gray-600 text-sm mt-1">Sistem Absensi Sekolah - Panel Administrasi</p>
+        </div>
+        <div class="text-sm text-gray-500">
+            <span class="font-medium">{{ date('d F Y') }}</span>
+        </div>
     </div>
-</div>
 
-<!-- Statistics Cards -->
-<div class="row">
-    <div class="col-md-3 mb-4">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-people"></i> Total Murid</h5>
-                <h2 class="card-text display-6">{{ $totalMurid }}</h2>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-4">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-person-badge"></i> Total Guru</h5>
-                <h2 class="card-text display-6">{{ $totalGuru }}</h2>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-4">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-calendar-check"></i> Absensi Hari Ini</h5>
-                <h2 class="card-text display-6">{{ $absensiHariIni }}</h2>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-4">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-check-circle"></i> Valid Hari Ini</h5>
-                <h2 class="card-text display-6">{{ $absensiValid }}</h2>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- School Configuration -->
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Konfigurasi Lokasi Sekolah</h5>
-            </div>
-            <div class="card-body">
-                <form action="{{ route('admin.school.update') }}" method="POST">
-                    @csrf
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="latitude" class="form-label">Latitude</label>
-                            <input type="number" step="any" class="form-control" id="latitude" 
-                                   name="latitude" value="{{ $school->latitude ?? '-6.2088' }}" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="longitude" class="form-label">Longitude</label>
-                            <input type="number" step="any" class="form-control" id="longitude" 
-                                   name="longitude" value="{{ $school->longitude ?? '106.8456' }}" required>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="radius" class="form-label">Radius Absensi (meter)</label>
-                        <input type="number" class="form-control" id="radius" name="radius" 
-                               value="{{ $school->radius ?? 100 }}" min="10" required>
-                        <div class="form-text">Jarak maksimal dari sekolah untuk absensi valid</div>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Simpan Perubahan
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Quick Actions -->
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
-            </div>
-            <div class="card-body">
-                <div class="d-grid gap-3">
-                    <a href="{{ route('admin.users') }}?role=murid" class="btn btn-outline-primary btn-lg">
-                        <i class="bi bi-people"></i> Kelola Murid
-                    </a>
-                    <a href="{{ route('admin.users') }}?role=guru" class="btn btn-outline-success btn-lg">
-                        <i class="bi bi-person-badge"></i> Kelola Guru
-                    </a>
-                    <a href="{{ route('admin.attendance') }}?role=murid&date={{ date('Y-m-d') }}" 
-                       class="btn btn-outline-info btn-lg">
-                        <i class="bi bi-calendar-check"></i> Lihat Absensi
-                    </a>
-                    <a href="{{ route('admin.time.settings') }}" class="btn btn-outline-warning btn-lg">
-                        <i class="bi bi-clock"></i> Kelola Waktu Absen
-                    </a>
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="glass-card rounded-xl p-6 border border-gray-100 hover-lift">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+                    <i class="bi bi-people text-blue-600 text-xl"></i>
                 </div>
+                <span class="text-xs font-medium text-gray-500">Total</span>
+            </div>
+            <h3 class="text-3xl font-bold text-gray-900 mb-2">{{ $totalMurid }}</h3>
+            <p class="text-sm text-gray-600">Murid Terdaftar</p>
+        </div>
+        
+        <div class="glass-card rounded-xl p-6 border border-gray-100 hover-lift">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50">
+                    <i class="bi bi-person-badge text-emerald-600 text-xl"></i>
+                </div>
+                <span class="text-xs font-medium text-gray-500">Total</span>
+            </div>
+            <h3 class="text-3xl font-bold text-gray-900 mb-2">{{ $totalGuru }}</h3>
+            <p class="text-sm text-gray-600">Guru Terdaftar</p>
+        </div>
+        
+        <div class="glass-card rounded-xl p-6 border border-gray-100 hover-lift">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
+                    <i class="bi bi-calendar-check text-purple-600 text-xl"></i>
+                </div>
+                <span class="text-xs font-medium text-gray-500">Hari Ini</span>
+            </div>
+            <h3 class="text-3xl font-bold text-gray-900 mb-2">{{ $absensiHariIni }}</h3>
+            <p class="text-sm text-gray-600">Absensi Hari Ini</p>
+        </div>
+        
+        <div class="glass-card rounded-xl p-6 border border-gray-100 hover-lift">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-50 to-yellow-50">
+                    <i class="bi bi-check-circle text-amber-600 text-xl"></i>
+                </div>
+                <span class="text-xs font-medium text-gray-500">Valid</span>
+            </div>
+            <h3 class="text-3xl font-bold text-gray-900 mb-2">{{ $absensiValid }}</h3>
+            <p class="text-sm text-gray-600">Absensi Valid</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- School Configuration -->
+        <div class="glass-card rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="bi bi-geo-alt text-gradient mr-2"></i>
+                    Konfigurasi Lokasi Sekolah
+                </h2>
+            </div>
+            
+            <form action="{{ route('admin.school.update') }}" method="POST" class="space-y-6">
+                @csrf
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label for="latitude" class="text-sm font-medium text-gray-700">Latitude</label>
+                        <input type="number" 
+                               step="any" 
+                               id="latitude" 
+                               name="latitude" 
+                               value="{{ $school->latitude ?? '-6.2088' }}" 
+                               required
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label for="longitude" class="text-sm font-medium text-gray-700">Longitude</label>
+                        <input type="number" 
+                               step="any" 
+                               id="longitude" 
+                               name="longitude" 
+                               value="{{ $school->longitude ?? '106.8456' }}" 
+                               required
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm">
+                    </div>
+                </div>
+                
+                <div class="space-y-2">
+                    <label for="radius" class="text-sm font-medium text-gray-700">Radius Absensi (meter)</label>
+                    <input type="number" 
+                           id="radius" 
+                           name="radius" 
+                           value="{{ $school->radius ?? 100 }}" 
+                           min="10" 
+                           required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-sm">
+                    <p class="text-xs text-gray-500">Jarak maksimal dari sekolah untuk absensi valid</p>
+                </div>
+                
+                <button type="submit" class="w-full flex items-center justify-center space-x-2 gradient-bg text-white py-3 rounded-xl hover:opacity-90 transition-opacity text-sm font-semibold hover-lift">
+                    <i class="bi bi-save"></i>
+                    <span>Simpan Perubahan</span>
+                </button>
+            </form>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="glass-card rounded-2xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="bi bi-lightning text-gradient mr-2"></i>
+                    Quick Actions
+                </h2>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <a href="{{ route('admin.users') }}?role=murid" class="flex items-center justify-center space-x-2 p-4 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors hover-lift">
+                    <i class="bi bi-people text-blue-600"></i>
+                    <span class="text-sm font-medium">Kelola Murid</span>
+                </a>
+                
+                <a href="{{ route('admin.users') }}?role=guru" class="flex items-center justify-center space-x-2 p-4 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors hover-lift">
+                    <i class="bi bi-person-badge text-emerald-600"></i>
+                    <span class="text-sm font-medium">Kelola Guru</span>
+                </a>
+                
+                <a href="{{ route('admin.attendance') }}?role=murid&date={{ date('Y-m-d') }}" 
+                   class="flex items-center justify-center space-x-2 p-4 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors hover-lift">
+                    <i class="bi bi-calendar-check text-purple-600"></i>
+                    <span class="text-sm font-medium">Lihat Absensi</span>
+                </a>
+                
+                <a href="{{ route('admin.time.settings') }}" class="flex items-center justify-center space-x-2 p-4 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors hover-lift">
+                    <i class="bi bi-clock text-amber-600"></i>
+                    <span class="text-sm font-medium">Kelola Waktu</span>
+                </a>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Active Time Settings -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Waktu Absen Aktif</h5>
-            </div>
-            <div class="card-body">
-                @if($timeSettings->count() > 0)
-                    <div class="row">
-                        @foreach($timeSettings as $setting)
-                            <div class="col-md-3 mb-3">
-                                <div class="card h-100 border-{{ $setting->type == 'masuk' ? 'primary' : 'success' }}">
-                                    <div class="card-body text-center">
-                                        <h5 class="card-title">{{ $setting->name }}</h5>
-                                        <h2 class="display-6">{{ $setting->start_time->format('H:i') }} - {{ $setting->end_time->format('H:i') }}</h2>
-                                        <span class="badge bg-{{ $setting->type == 'masuk' ? 'primary' : 'success' }}">
-                                            {{ ucfirst($setting->type) }}
-                                        </span>
-                                        <div class="mt-2">
-                                            <small class="text-muted">
-                                                Durasi: {{ $setting->start_time->diffInHours($setting->end_time) }} jam
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
+    <!-- Active Time Settings -->
+    <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                <i class="bi bi-clock-history text-gradient mr-2"></i>
+                Waktu Absen Aktif
+            </h2>
+            <span class="text-xs font-medium px-3 py-1 bg-gray-100 text-gray-700 rounded-full">
+                {{ $timeSettings->count() }} waktu aktif
+            </span>
+        </div>
+        
+        @if($timeSettings->count() > 0)
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                @foreach($timeSettings as $setting)
+                    <div class="bg-white border border-gray-200 rounded-xl p-5 hover-lift">
+                        <div class="text-center">
+                            <h5 class="text-sm font-semibold text-gray-900 mb-3">{{ $setting->name }}</h5>
+                            <div class="text-2xl font-bold text-gray-900 mb-2">
+                                {{ $setting->start_time->format('H:i') }} - {{ $setting->end_time->format('H:i') }}
                             </div>
-                        @endforeach
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-medium 
+                                {{ $setting->type == 'masuk' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                {{ ucfirst($setting->type) }}
+                            </span>
+                            <div class="mt-3">
+                                <small class="text-gray-500 text-xs">
+                                    Durasi: {{ $setting->start_time->diffInHours($setting->end_time) }} jam
+                                </small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="alert alert-light mt-3">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>Total {{ $timeSettings->count() }} waktu absen aktif</strong> |
-                        Masuk: {{ $timeSettings->where('type', 'masuk')->count() }} |
-                        Pulang: {{ $timeSettings->where('type', 'pulang')->count() }}
-                    </div>
-                @else
-                    <div class="text-center py-3">
-                        <i class="bi bi-clock display-1 text-muted"></i>
-                        <h4 class="mt-3">Belum ada waktu absen aktif</h4>
-                        <p class="text-muted">
-                            <a href="{{ route('admin.time.settings') }}" class="btn btn-warning">
-                                <i class="bi bi-plus-circle"></i> Tambah Waktu Absen
-                            </a>
-                        </p>
-                    </div>
-                @endif
+                @endforeach
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Attendances -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Absensi Terbaru</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Nama</th>
-                                <th>Role</th>
-                                <th>Tanggal</th>
-                                <th>Waktu</th>
-                                <th>Tipe</th>
-                                <th>Jarak</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($recentAttendances as $attendance)
-                                <tr>
-                                    <td>{{ $attendance->user->full_name ?? $attendance->user->username }}</td>
-                                    <td>
-                                        <span class="badge bg-{{ $attendance->role === 'murid' ? 'primary' : 'success' }}">
-                                            {{ ucfirst($attendance->role) }}
-                                        </span>
-                                    </td>
-                                    <td>{{ $attendance->date->format('d/m/Y') }}</td>
-                                    <td>{{ $attendance->time }}</td>
-                                    <td>
-                                        <span class="badge bg-{{ $attendance->attendance_type === 'masuk' ? 'primary' : 'success' }}">
-                                            {{ ucfirst($attendance->attendance_type) }}
-                                        </span>
-                                    </td>
-                                    <td>{{ number_format($attendance->distance, 0) }} m</td>
-                                    <td>
-                                        <span class="status-badge status-{{ strtolower($attendance->status) }}">
-                                            {{ $attendance->status }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="text-center">Belum ada data absensi</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                <div class="text-center mt-3">
-                    <a href="{{ route('admin.attendance') }}" class="btn btn-outline-dark">
-                        <i class="bi bi-list-ul"></i> Lihat Semua Absensi
+            
+            <div class="mt-6 p-4 bg-gray-50 rounded-xl">
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                            <span class="text-gray-700">Masuk: {{ $timeSettings->where('type', 'masuk')->count() }}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                            <span class="text-gray-700">Pulang: {{ $timeSettings->where('type', 'pulang')->count() }}</span>
+                        </div>
+                    </div>
+                    <a href="{{ route('admin.time.settings') }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+                        Kelola Waktu →
                     </a>
                 </div>
             </div>
-        </div>
+        @else
+            <div class="text-center py-8">
+                <div class="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <i class="bi bi-clock text-gray-400 text-2xl"></i>
+                </div>
+                <h4 class="text-gray-700 font-medium mb-2">Belum ada waktu absen aktif</h4>
+                <p class="text-gray-500 text-sm mb-4">Tambahkan waktu absen untuk mengaktifkan sistem</p>
+                <a href="{{ route('admin.time.settings') }}" class="inline-flex items-center space-x-2 gradient-bg text-white px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity">
+                    <i class="bi bi-plus-circle"></i>
+                    <span>Tambah Waktu Absen</span>
+                </a>
+            </div>
+        @endif
     </div>
-</div>
 
-<!-- Current Time Info -->
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-clock"></i> Waktu Server Saat Ini</h5>
-            </div>
-            <div class="card-body text-center">
-                <h2 id="serverTime" class="display-4">{{ now()->format('H:i:s') }}</h2>
-                <p class="text-muted mb-0">{{ now()->format('d F Y') }}</p>
-            </div>
+    <!-- Recent Attendances -->
+    <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                <i class="bi bi-clock-history text-gradient mr-2"></i>
+                Absensi Terbaru
+            </h2>
+            <a href="{{ route('admin.attendance') }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+                Lihat Semua →
+            </a>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-gray-200">
+                        <th class="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                        <th class="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th class="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                        <th class="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
+                        <th class="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Tipe</th>
+                        <th class="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Jarak</th>
+                        <th class="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @forelse($recentAttendances as $attendance)
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="py-3 px-4">
+                                <div class="text-sm font-medium text-gray-900">
+                                    {{ $attendance->user->full_name ?? $attendance->user->username }}
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {{ $attendance->role === 'murid' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                    {{ ucfirst($attendance->role) }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="text-sm text-gray-900">{{ $attendance->date->format('d/m/Y') }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="text-sm text-gray-900">{{ $attendance->time }}</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {{ $attendance->attendance_type === 'masuk' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                    {{ ucfirst($attendance->attendance_type) }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="text-sm text-gray-900">{{ number_format($attendance->distance, 0) }} m</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {{ strtolower($attendance->status) === 'valid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                    {{ $attendance->status }}
+                                </span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="py-8 px-4 text-center">
+                                <div class="text-gray-500">Belum ada data absensi</div>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Status Absensi Hari Ini</h5>
+
+    <!-- Current Time Info -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="glass-card rounded-2xl p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                <i class="bi bi-clock text-gradient mr-2"></i>
+                Waktu Server Saat Ini
+            </h3>
+            <div class="text-center">
+                <div id="serverTime" class="text-4xl font-bold text-gray-900 mb-2">{{ now()->format('H:i:s') }}</div>
+                <p class="text-gray-600 text-sm">{{ now()->format('d F Y') }}</p>
             </div>
-            <div class="card-body">
+        </div>
+        
+        <div class="glass-card rounded-2xl p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                <i class="bi bi-calendar-check text-gradient mr-2"></i>
+                Status Absensi Hari Ini
+            </h3>
+            <div class="grid grid-cols-2 gap-4 text-center">
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
+                    <div class="text-3xl font-bold text-gray-900 mb-1">{{ $absensiHariIni }}</div>
+                    <div class="text-xs text-gray-600 font-medium">Total Absensi</div>
+                </div>
+                <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4">
+                    <div class="text-3xl font-bold text-gray-900 mb-1">{{ $absensiValid }}</div>
+                    <div class="text-xs text-gray-600 font-medium">Absensi Valid</div>
+                </div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-gray-200">
                 <div class="text-center">
-                    <div class="row">
-                        <div class="col-6">
-                            <h3>{{ $absensiHariIni }}</h3>
-                            <small class="text-muted">Total Absensi</small>
-                        </div>
-                        <div class="col-6">
-                            <h3>{{ $absensiValid }}</h3>
-                            <small class="text-muted">Absensi Valid</small>
-                        </div>
-                    </div>
-                    <hr>
-                    <div>
-                        <small class="text-muted">Terakhir update: {{ now()->format('H:i:s') }}</small>
-                    </div>
+                    <small class="text-gray-500 text-xs">Terakhir update: {{ now()->format('H:i:s') }}</small>
                 </div>
             </div>
         </div>
     </div>
 </div>
-@endsection
-
-@push('styles')
-<style>
-.status-badge {
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 0.85em;
-}
-.status-valid {
-    background-color: #d4edda;
-    color: #155724;
-}
-.status-invalid {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-</style>
-@endpush
 
 @push('scripts')
 <script>
@@ -299,13 +340,6 @@
             second: '2-digit'
         });
         
-        const dateString = now.toLocaleDateString('id-ID', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        
         document.getElementById('serverTime').textContent = timeString;
     }
     
@@ -315,3 +349,4 @@
     });
 </script>
 @endpush
+@endsection

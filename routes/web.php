@@ -33,7 +33,7 @@ Route::post('/hadir', [AttendanceController::class, 'hadir'])->name('hadir');
 Route::post('/get-distance', [AttendanceController::class, 'getDistance'])->name('get.distance');
 Route::post('/check-attendance-time', [AttendanceController::class, 'checkAttendanceTime'])->name('check.attendance.time');
 
-// Admin Routes
+// Admin Routes - Middleware sudah dihandle di controller
 Route::prefix('admin')->group(function () {
     // Dashboard
     Route::get('/', [AdminController::class, 'dashboard'])->name('admin.dashboard');
@@ -55,8 +55,12 @@ Route::prefix('admin')->group(function () {
     // Attendance Time Settings
     Route::get('/attendance-time-settings', [AdminController::class, 'attendanceTimeSettings'])->name('admin.time.settings');
     Route::post('/attendance-time-settings/create', [AdminController::class, 'createTimeSetting'])->name('admin.time.settings.create');
-    Route::post('/attendance-time-settings/update/{id}', [AdminController::class, 'updateTimeSetting'])->name('admin.time.settings.update');
-    Route::delete('/attendance-time-settings/delete/{id}', [AdminController::class, 'deleteTimeSetting'])->name('admin.time.settings.delete');
+    
+    // Route untuk update dengan multiple methods
+    Route::match(['PUT', 'PATCH', 'POST'], '/attendance-time-settings/{id}', [AdminController::class, 'updateTimeSetting'])
+        ->name('admin.time.settings.update');
+    
+    Route::delete('/attendance-time-settings/{id}', [AdminController::class, 'deleteTimeSetting'])->name('admin.time.settings.delete');
     Route::get('/get-active-time-settings', [AdminController::class, 'getActiveTimeSettings'])->name('admin.get.time.settings');
     
     // Debug Route
