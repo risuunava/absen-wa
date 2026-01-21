@@ -44,6 +44,10 @@ Route::prefix('admin')->group(function () {
     Route::post('/users/edit/{id}', [AdminController::class, 'editUser'])->name('admin.users.edit');
     Route::delete('/users/delete/{id}', [AdminController::class, 'deleteUser'])->name('admin.users.delete');
     
+    // Import Users (CSV)
+    Route::post('/users/import', [AdminController::class, 'importUsers'])->name('admin.users.import');
+    Route::get('/users/download-template', [AdminController::class, 'downloadTemplate'])->name('admin.users.download-template');
+    
     // Attendance Management
     Route::get('/attendance', [AdminController::class, 'attendance'])->name('admin.attendance');
     Route::post('/attendance/{id}/verify-photo', [AdminController::class, 'verifyPhoto'])->name('admin.verify.photo');

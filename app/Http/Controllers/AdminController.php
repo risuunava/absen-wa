@@ -9,6 +9,7 @@ use App\Models\AttendanceTimeSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class AdminController extends Controller
 {
@@ -188,6 +189,165 @@ class AdminController extends Controller
 
         $user->delete();
         return back()->with('success', 'User berhasil dihapus.');
+    }
+
+    public function importUsers(Request $request)
+    {
+        $check = $this->checkAdmin();
+        if ($check) return $check;
+
+        $request->validate([
+            'file' => 'required|mimes:csv,txt|max:2048',
+            'role' => 'required|in:murid,guru'
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $role = $request->role;
+            
+            // Baca file CSV
+            $handle = fopen($file->getPathname(), 'r');
+            $importedCount = 0;
+            $failedRows = [];
+            $rowNumber = 0;
+            
+            // Header yang diharapkan
+            $expectedHeaders = ['username', 'phone', 'password', 'full_name', 'class', 'subject'];
+            
+            while (($row = fgetcsv($handle, 1000, ',')) !== false) {
+                $rowNumber++;
+                
+                // Skip header row
+                if ($rowNumber === 1) {
+                    continue;
+                }
+                
+                // Skip empty rows
+                if (empty($row[0])) {
+                    continue;
+                }
+                
+                // Pastikan ada minimal 4 kolom (username, phone, password, full_name)
+                if (count($row) < 4) {
+                    $failedRows[] = [
+                        'row' => $row,
+                        'row_number' => $rowNumber,
+                        'errors' => ['Format baris tidak valid. Minimal harus ada 4 kolom: username, phone, password, full_name']
+                    ];
+                    continue;
+                }
+                
+                // Mapping data
+                $data = [
+                    'username' => $row[0] ?? '',
+                    'phone' => $row[1] ?? '',
+                    'password' => $row[2] ?? '',
+                    'full_name' => $row[3] ?? '',
+                    'class' => $row[4] ?? null,
+                    'subject' => $row[5] ?? null,
+                ];
+                
+                // Validasi data
+                $validator = Validator::make($data, [
+                    'username' => 'required|unique:users,username',
+                    'phone' => 'required|unique:users,phone',
+                    'password' => 'required|min:6',
+                    'full_name' => 'required',
+                ]);
+                
+                // Validasi tambahan berdasarkan role
+                if ($role === 'murid' && empty($data['class'])) {
+                    $validator->errors()->add('class', 'Field class wajib diisi untuk murid');
+                }
+                
+                if ($role === 'guru' && empty($data['subject'])) {
+                    $validator->errors()->add('subject', 'Field subject wajib diisi untuk guru');
+                }
+                
+                if ($validator->fails()) {
+                    $failedRows[] = [
+                        'row' => $row,
+                        'row_number' => $rowNumber,
+                        'errors' => $validator->errors()->all()
+                    ];
+                    continue;
+                }
+                
+                try {
+                    // Create user
+                    User::create([
+                        'username' => $data['username'],
+                        'phone' => $data['phone'],
+                        'password' => Hash::make($data['password']),
+                        'role' => $role,
+                        'full_name' => $data['full_name'],
+                        'class' => $data['class'],
+                        'subject' => $data['subject'],
+                    ]);
+                    
+                    $importedCount++;
+                    
+                } catch (\Exception $e) {
+                    $failedRows[] = [
+                        'row' => $row,
+                        'row_number' => $rowNumber,
+                        'errors' => ['Gagal menyimpan: ' . $e->getMessage()]
+                    ];
+                }
+            }
+            
+            fclose($handle);
+            
+            $message = "Berhasil mengimpor {$importedCount} user.";
+            
+            if (!empty($failedRows)) {
+                $failedCount = count($failedRows);
+                $message .= " {$failedCount} baris gagal diimpor.";
+                
+                // Simpan detail error
+                session()->flash('import_errors', $failedRows);
+            }
+            
+            return redirect()->route('admin.users', ['role' => $role])
+                ->with('success', $message);
+                
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal mengimpor file: ' . $e->getMessage());
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        $check = $this->checkAdmin();
+        if ($check) return $check;
+
+        $filename = "template_import_user.csv";
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+        
+        $callback = function() {
+            $file = fopen('php://output', 'w');
+            
+            // Add BOM for UTF-8
+            fwrite($file, "\xEF\xBB\xBF");
+            
+            // Header
+            fputcsv($file, ['username', 'phone', 'password', 'full_name', 'class', 'subject']);
+            
+            // Contoh data untuk murid
+            fputcsv($file, ['siswa001', '081234567890', 'password123', 'Nama Siswa 1', 'X IPA 1', '']);
+            fputcsv($file, ['siswa002', '081234567891', 'password123', 'Nama Siswa 2', 'X IPA 2', '']);
+            
+            // Contoh data untuk guru
+            fputcsv($file, ['guru001', '081234567892', 'password123', 'Nama Guru 1', '', 'Matematika']);
+            fputcsv($file, ['guru002', '081234567893', 'password123', 'Nama Guru 2', '', 'Bahasa Inggris']);
+            
+            fclose($file);
+        };
+        
+        return response()->stream($callback, 200, $headers);
     }
 
     public function attendance(Request $request)
@@ -457,7 +617,7 @@ class AdminController extends Controller
                 'end_time' => $request->end_time,
                 'type' => $request->type,
                 'days_of_week' => $daysOfWeek,
-                'description' => $request->description,
+                'description' => $setting->description,
                 'is_active' => $isActive
             ]);
 
